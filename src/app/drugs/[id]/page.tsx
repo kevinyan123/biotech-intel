@@ -3,6 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { DB, mcTier, mcTierColor } from "@/lib/biovault-data";
+import { milestoneColor, relativeTime, daysUntil } from "@/lib/catalyst-utils";
 
 const coMap = new Map(DB.companies.map((c) => [c.id, c]));
 import BioCard from "@/components/ui/BioCard";
@@ -70,15 +71,21 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Catalysts */}
       {cat.length > 0 && <>
-        <SectionHeader>Catalysts</SectionHeader>
+        <SectionHeader>Catalysts ({cat.length})</SectionHeader>
         <BioCard className="mb-2.5">
-          {cat.map((c, i) => (
-            <div key={i} className="flex gap-[7px] py-1 text-[10px]" style={{ borderBottom: i < cat.length - 1 ? "1px solid var(--color-bd)" : "none" }}>
-              <span className="font-mono min-w-[64px] text-[9px]" style={{ color: "var(--color-ac)" }}>{c.date}</span>
-              <span className="font-semibold">{c.type}</span>
-              <span style={{ color: "var(--color-t2)" }}>· {c.indication}</span>
-            </div>
-          ))}
+          {cat.map((c, i) => {
+            const mc = milestoneColor(c.type);
+            const days = daysUntil(c.date);
+            return (
+              <div key={i} className="flex gap-[7px] py-1.5 items-center text-[10px]" style={{ borderBottom: i < cat.length - 1 ? "1px solid var(--color-bd)" : "none" }}>
+                <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: mc, boxShadow: `0 0 5px ${mc}66` }} />
+                <span className="font-mono min-w-[64px] text-[9px]" style={{ color: "var(--color-ac)" }}>{c.date}</span>
+                <span className="font-mono text-[9px] min-w-[52px]" style={{ color: mc }}>{relativeTime(c.date)}</span>
+                <span className="font-semibold">{c.type}</span>
+                <span style={{ color: "var(--color-t2)" }}>· {c.indication}</span>
+              </div>
+            );
+          })}
         </BioCard>
       </>}
 
@@ -86,8 +93,11 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
       {tr.length > 0 && (() => {
         const sorted = [...tr].sort((a, b) => a.startDate.localeCompare(b.startDate));
         const dates = sorted.flatMap((t) => [t.startDate, t.estCompletion]).filter(Boolean);
-        const minD = dates.reduce((a, b) => a < b ? a : b);
-        const maxD = dates.reduce((a, b) => a > b ? a : b);
+        // Include catalyst dates in range
+        const catDates = cat.map(c => c.date);
+        const allDates = [...dates, ...catDates];
+        const minD = allDates.reduce((a, b) => a < b ? a : b);
+        const maxD = allDates.reduce((a, b) => a > b ? a : b);
         const minT = new Date(minD).getTime();
         const range = Math.max(1, new Date(maxD).getTime() - minT);
         const pct = (d: string) => ((new Date(d).getTime() - minT) / range) * 100;
@@ -98,24 +108,61 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
         };
         const phaseOrder: Record<string, number> = { "Phase 1": 1, "Phase 1/2": 2, "Phase 2": 3, "Phase 2/3": 4, "Phase 3": 5, "NDA/BLA": 6, Approved: 7, Preclinical: 0 };
         const bySorted = [...sorted].sort((a, b) => (phaseOrder[a.phase] ?? 0) - (phaseOrder[b.phase] ?? 0));
-        const years = new Set<string>();
-        for (let y = new Date(minD).getFullYear(); y <= new Date(maxD).getFullYear(); y++) years.add(String(y));
+
+        // Build year + quarter markers
+        const startYear = new Date(minD).getFullYear();
+        const endYear = new Date(maxD).getFullYear();
+        const markers: { label: string; pos: number; major: boolean }[] = [];
+        for (let y = startYear; y <= endYear; y++) {
+          for (let q = 0; q < 4; q++) {
+            const m = q * 3 + 1;
+            const dateStr = `${y}-${String(m).padStart(2, "0")}-01`;
+            const pos = pct(dateStr);
+            if (pos >= -2 && pos <= 102) {
+              markers.push({ label: q === 0 ? String(y) : `Q${q + 1}`, pos: Math.max(0, Math.min(100, pos)), major: q === 0 });
+            }
+          }
+        }
+
+        // Dynamic today
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const todayPct = pct(todayStr);
 
         return <>
           <SectionHeader>Trial Timeline</SectionHeader>
           <BioCard className="mb-3">
-            {/* Year markers */}
-            <div className="relative h-4 mb-1" style={{ marginLeft: 90 }}>
-              {[...years].map((y) => {
-                const pos = pct(`${y}-01-01`);
-                if (pos < 0 || pos > 100) return null;
-                return <span key={y} className="absolute text-[7px] font-mono" style={{ left: `${pos}%`, color: "var(--color-t2)", transform: "translateX(-50%)" }}>{y}</span>;
-              })}
+            {/* Axis markers */}
+            <div className="relative h-5 mb-1" style={{ marginLeft: 90 }}>
+              {markers.map((m, i) => (
+                <span key={i} className="absolute text-[7px] font-mono" style={{
+                  left: `${m.pos}%`, color: m.major ? "var(--color-t1)" : "var(--color-t2)",
+                  transform: "translateX(-50%)", fontWeight: m.major ? 700 : 400, fontSize: m.major ? 8 : 7,
+                  opacity: m.major ? 1 : 0.6,
+                }}>
+                  {m.label}
+                </span>
+              ))}
             </div>
+            {/* Axis line with ticks */}
+            <div className="relative h-[6px] mb-2" style={{ marginLeft: 90 }}>
+              <div className="absolute inset-x-0 top-[2px] h-px" style={{ background: "var(--color-bd)" }} />
+              {markers.map((m, i) => (
+                <div key={i} className="absolute" style={{
+                  left: `${m.pos}%`, top: 0, width: 1, height: m.major ? 6 : 4,
+                  background: m.major ? "var(--color-t2)" : "var(--color-bd)",
+                }} />
+              ))}
+              {/* Today marker on axis */}
+              {todayPct >= 0 && todayPct <= 100 && (
+                <div className="absolute" style={{ left: `${todayPct}%`, top: -2, width: 2, height: 10, background: "var(--color-ac)", borderRadius: 1, opacity: 0.7 }} />
+              )}
+            </div>
+
+            {/* Trial rows with milestone markers */}
             {bySorted.map((t, i) => {
-              const left = Math.max(0, Math.min(100, pct(t.startDate)));
-              const right = Math.max(0, Math.min(100, pct(t.estCompletion)));
-              const w = Math.max(1, right - left);
+              const startPct = Math.max(0, Math.min(100, pct(t.startDate)));
+              const endPct = Math.max(0, Math.min(100, pct(t.estCompletion)));
               const clr = statusColor[t.status] || "var(--color-t2)";
               const isTerminated = t.status === "Terminated" || t.status === "Withdrawn";
               return (
@@ -125,20 +172,33 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
                   <div className="shrink-0 w-[82px] text-right">
                     <span className="text-[7px] font-mono font-semibold" style={{ color: clr }}>{t.phase.replace("Phase ", "P")}</span>
                   </div>
-                  <div className="flex-1 relative h-[14px]" style={{ background: "var(--color-b2)", borderRadius: 3 }}>
+                  <div className="flex-1 relative h-[16px]" style={{ background: "var(--color-b2)", borderRadius: 3 }}>
+                    {/* Connecting line between start and end */}
                     <div style={{
-                      position: "absolute", left: `${left}%`, width: `${w}%`, top: 1, bottom: 1,
-                      borderRadius: 2, opacity: isTerminated ? 0.4 : 0.85,
-                      background: isTerminated ? `repeating-linear-gradient(135deg,${clr}44,${clr}44 2px,${clr}22 2px,${clr}22 4px)` : `linear-gradient(90deg,${clr}55,${clr}bb)`,
-                      border: `1px solid ${clr}${isTerminated ? "44" : "66"}`,
+                      position: "absolute", left: `${startPct}%`, width: `${Math.max(0.5, endPct - startPct)}%`, top: 7, height: 2,
+                      borderRadius: 1, opacity: isTerminated ? 0.3 : 0.6,
+                      background: isTerminated
+                        ? `repeating-linear-gradient(90deg,${clr}66 0,${clr}66 3px,transparent 3px,transparent 6px)`
+                        : `linear-gradient(90deg,${clr}44,${clr}88)`,
+                    }} />
+                    {/* Start marker (circle) */}
+                    <div style={{
+                      position: "absolute", left: `${startPct}%`, top: 4, width: 8, height: 8,
+                      borderRadius: "50%", background: clr, opacity: isTerminated ? 0.4 : 0.85,
+                      transform: "translateX(-4px)", border: `1.5px solid ${clr}`,
+                      boxShadow: isTerminated ? "none" : `0 0 4px ${clr}44`,
+                    }} />
+                    {/* End marker (diamond) */}
+                    <div style={{
+                      position: "absolute", left: `${endPct}%`, top: 4, width: 8, height: 8,
+                      transform: "translateX(-4px) rotate(45deg)", background: clr,
+                      opacity: isTerminated ? 0.4 : 0.85, borderRadius: 1,
+                      boxShadow: isTerminated ? "none" : `0 0 4px ${clr}44`,
                     }} />
                     {/* Today marker */}
-                    {(() => {
-                      const todayPct = pct("2026-03-06");
-                      return todayPct >= 0 && todayPct <= 100 ? (
-                        <div style={{ position: "absolute", left: `${todayPct}%`, top: 0, bottom: 0, width: 1, background: "var(--color-ac)", opacity: 0.3 }} />
-                      ) : null;
-                    })()}
+                    {todayPct >= 0 && todayPct <= 100 && (
+                      <div style={{ position: "absolute", left: `${todayPct}%`, top: 0, bottom: 0, width: 1, background: "var(--color-ac)", opacity: 0.25 }} />
+                    )}
                   </div>
                   <div className="shrink-0 w-[55px]">
                     <span className="text-[7px] font-mono group-hover:underline" style={{ color: clr }}>{t.status.length > 8 ? t.status.slice(0, 7) + "…" : t.status}</span>
@@ -146,13 +206,58 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               );
             })}
+
+            {/* Catalyst milestone row */}
+            {cat.length > 0 && (
+              <div className="flex items-center gap-1.5 pt-1.5 mt-1" style={{ borderTop: "1px solid var(--color-bd)" }}>
+                <div className="shrink-0 w-[82px] text-right">
+                  <span className="text-[7px] font-mono font-semibold" style={{ color: "var(--color-t2)" }}>Catalysts</span>
+                </div>
+                <div className="flex-1 relative h-[18px]" style={{ background: "var(--color-b2)", borderRadius: 3 }}>
+                  {cat.map((c, i) => {
+                    const pos = pct(c.date);
+                    if (pos < 0 || pos > 100) return null;
+                    const mc = milestoneColor(c.type);
+                    return (
+                      <div key={i} className="absolute group/cat" style={{ left: `${pos}%`, top: 3 }}>
+                        <div style={{
+                          width: 10, height: 10, transform: "translateX(-5px) rotate(45deg)",
+                          background: mc, borderRadius: 1.5, opacity: 0.9,
+                          boxShadow: `0 0 6px ${mc}55`,
+                        }} />
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded text-[8px] whitespace-nowrap pointer-events-none opacity-0 group-hover/cat:opacity-100 transition-opacity z-10"
+                          style={{ background: "var(--color-b3)", border: "1px solid var(--color-bd)", color: "var(--color-t0)" }}>
+                          <div className="font-semibold" style={{ color: mc }}>{c.type}</div>
+                          <div>{c.date} · {relativeTime(c.date)}</div>
+                          <div style={{ color: "var(--color-t2)" }}>{c.indication}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Today marker */}
+                  {todayPct >= 0 && todayPct <= 100 && (
+                    <div style={{ position: "absolute", left: `${todayPct}%`, top: 0, bottom: 0, width: 1, background: "var(--color-ac)", opacity: 0.25 }} />
+                  )}
+                </div>
+                <div className="shrink-0 w-[55px]" />
+              </div>
+            )}
+
             {/* Legend */}
-            <div className="flex gap-2 mt-2 flex-wrap">
+            <div className="flex gap-2 mt-2.5 flex-wrap items-center">
               {Object.entries(statusColor).filter(([s]) => tr.some((t) => t.status === s)).map(([s, c]) => (
                 <span key={s} className="flex items-center gap-0.5 text-[7px]" style={{ color: c }}>
                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: c }} />{s}
                 </span>
               ))}
+              <span className="text-[7px] mx-1" style={{ color: "var(--color-t2)", opacity: 0.4 }}>|</span>
+              <span className="flex items-center gap-0.5 text-[7px]" style={{ color: "var(--color-t1)" }}>
+                <span className="inline-block w-[6px] h-[6px] rounded-full" style={{ background: "var(--color-t2)" }} />Start
+              </span>
+              <span className="flex items-center gap-0.5 text-[7px]" style={{ color: "var(--color-t1)" }}>
+                <span className="inline-block w-[5px] h-[5px] rotate-45" style={{ background: "var(--color-t2)", borderRadius: 1 }} />Completion
+              </span>
               <span className="flex items-center gap-0.5 text-[7px]" style={{ color: "var(--color-ac)", opacity: 0.5 }}>
                 <span className="inline-block w-[6px] h-[1px]" style={{ background: "var(--color-ac)" }} />Today
               </span>

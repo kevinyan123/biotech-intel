@@ -6,18 +6,7 @@ import { DB, PH, mcTier, mcTierColor, pC } from "@/lib/biovault-data";
 import BioCard from "@/components/ui/BioCard";
 import PhaseBadge from "@/components/ui/PhaseBadge";
 import SectionHeader from "@/components/ui/SectionHeader";
-
-const catTypeColor = (t: string) => {
-  if (t.includes("PDUFA") || t.includes("NDA") || t.includes("EMA")) return "#f48fb1";
-  if (t.includes("Ph3") || t.includes("Phase 3")) return "#ffb74d";
-  if (t.includes("Ph2") || t.includes("Phase 2")) return "#81c784";
-  if (t.includes("BTD") || t.includes("Fast") || t.includes("Orphan")) return "#ce93d8";
-  if (t.includes("Conference")) return "#4fc3f7";
-  if (t.includes("Interim")) return "#aed581";
-  if (t.includes("AdCom")) return "#ff8a65";
-  if (t.includes("Enrollment")) return "#90caf9";
-  return "var(--color-a3)";
-};
+import { milestoneColor, relativeTime, daysUntil, MILESTONE_LEGEND } from "@/lib/catalyst-utils";
 
 export default function CatalystsPage() {
   const now = new Date();
@@ -69,12 +58,15 @@ export default function CatalystsPage() {
 
   // Upcoming events: from today onwards
   const todayStr = `${todayYear}-${String(todayMonth).padStart(2, "0")}-${String(todayDay).padStart(2, "0")}`;
-  const upcomingEvents = useMemo(() => filtered.filter(c => c.date >= todayStr), [filtered, todayStr]);
+  const upcomingEvents = useMemo(() => filtered.filter(c => c.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date)), [filtered, todayStr]);
   const listEvents = listMode === "upcoming" ? upcomingEvents : filtered;
 
   // Stats
   const uniqueCos = new Set(filtered.map(c => c.companyId)).size;
   const upcomingCount = upcomingEvents.length;
+
+  // Next catalyst (first upcoming event across all data)
+  const nextCatalyst = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
 
   return (
     <div style={{ animation: "fi .2s ease-out" }}>
@@ -92,13 +84,59 @@ export default function CatalystsPage() {
         </button>
       </div>
 
-      {/* Legend */}
+      {/* Next Catalyst Highlight */}
+      {nextCatalyst && (
+        <Link href={`/drugs/${nextCatalyst.drugId}`}
+          className="block mb-4 rounded-xl p-[1px] transition-transform hover:scale-[1.005]"
+          style={{ background: `linear-gradient(135deg, ${milestoneColor(nextCatalyst.type)}44, var(--color-bd), ${milestoneColor(nextCatalyst.type)}22)` }}>
+          <div className="rounded-[11px] px-4 py-3.5" style={{ background: "var(--color-b1)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: "var(--color-t2)" }}>Next Catalyst</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: milestoneColor(nextCatalyst.type) }} />
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[15px] font-bold">{nextCatalyst.drugName}</span>
+                  <span className="text-[9px] font-bold rounded px-1.5 py-0.5"
+                    style={{ color: milestoneColor(nextCatalyst.type), background: `${milestoneColor(nextCatalyst.type)}15`, border: `1px solid ${milestoneColor(nextCatalyst.type)}30` }}>
+                    {nextCatalyst.type}
+                  </span>
+                </div>
+                <div className="flex gap-1.5 items-center text-[10px]" style={{ color: "var(--color-t2)" }}>
+                  <span>{nextCatalyst.companyName}</span>
+                  <span>·</span>
+                  <span>{nextCatalyst.indication}</span>
+                </div>
+                <div className="flex gap-1.5 items-center mt-1.5">
+                  <PhaseBadge phase={nextCatalyst.drugPhase} small />
+                  <span className="text-[9px] font-semibold" style={{ color: mcTierColor(nextCatalyst.tier) }}>{nextCatalyst.tier} Cap</span>
+                  {nextCatalyst.mc && <span className="text-[9px] font-mono" style={{ color: "var(--color-t2)" }}>${nextCatalyst.mc}B</span>}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[13px] font-bold font-mono" style={{ color: "var(--color-ac)" }}>
+                  {(() => { const [, m, d] = nextCatalyst.date.split("-"); return `${monthNames[parseInt(m)]} ${parseInt(d)}`; })()}
+                </div>
+                <div className="text-[11px] font-semibold" style={{ color: milestoneColor(nextCatalyst.type) }}>
+                  {relativeTime(nextCatalyst.date)}
+                </div>
+                <div className="text-[9px] font-mono mt-0.5" style={{ color: "var(--color-t2)" }}>
+                  {Math.abs(daysUntil(nextCatalyst.date))}d {daysUntil(nextCatalyst.date) >= 0 ? "away" : "ago"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {/* Legend — 4-category system */}
       <div className="flex gap-2.5 mb-3.5 text-[9px] flex-wrap items-center" style={{ color: "var(--color-t2)" }}>
         <span className="font-semibold">Legend:</span>
-        {[["PDUFA / NDA / EMA", "#f48fb1"], ["Phase 3 Readout", "#ffb74d"], ["Phase 2 Data", "#81c784"], ["Regulatory", "#ce93d8"], ["Conference", "#4fc3f7"], ["AdCom", "#ff8a65"], ["Interim / Enrollment", "#90caf9"]].map(([label, color], i) => (
+        {MILESTONE_LEGEND.map((item, i) => (
           <span key={i} className="inline-flex items-center gap-[3px]">
-            <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: color, boxShadow: `0 0 4px ${color}55` }} />
-            {label}
+            <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: item.color, boxShadow: `0 0 4px ${item.color}55` }} />
+            {item.label}
           </span>
         ))}
       </div>
@@ -138,7 +176,7 @@ export default function CatalystsPage() {
             {types.map((t) => (
               <button key={t} onClick={() => setTypeF(typeF === t ? null : t)}
                 className="rounded-[5px] px-[9px] py-[3px] text-[9px] cursor-pointer transition-all"
-                style={{ background: typeF === t ? `${catTypeColor(t)}15` : "transparent", border: `1px solid ${typeF === t ? catTypeColor(t) + "44" : "var(--color-bd)"}`, color: typeF === t ? catTypeColor(t) : "var(--color-t2)", fontWeight: typeF === t ? 600 : 400 }}>
+                style={{ background: typeF === t ? `${milestoneColor(t)}15` : "transparent", border: `1px solid ${typeF === t ? milestoneColor(t) + "44" : "var(--color-bd)"}`, color: typeF === t ? milestoneColor(t) : "var(--color-t2)", fontWeight: typeF === t ? 600 : 400 }}>
                 {t}
               </button>
             ))}
@@ -193,7 +231,7 @@ export default function CatalystsPage() {
                       </div>
                       <div className="flex flex-wrap gap-0.5 mb-[3px]">
                         {events.slice(0, 6).map((ev, i) => (
-                          <div key={i} className="w-[7px] h-[7px] rounded-full" style={{ background: catTypeColor(ev.type), boxShadow: `0 0 4px ${catTypeColor(ev.type)}66` }} />
+                          <div key={i} className="w-[7px] h-[7px] rounded-full" style={{ background: milestoneColor(ev.type), boxShadow: `0 0 4px ${milestoneColor(ev.type)}66` }} />
                         ))}
                         {events.length > 6 && <span className="text-[7px]" style={{ color: "var(--color-t2)" }}>+{events.length - 6}</span>}
                       </div>
@@ -217,6 +255,9 @@ export default function CatalystsPage() {
             <div className="flex justify-between items-center mb-3.5">
               <div>
                 <div className="text-base font-bold font-serif">{monthNames[month]} {selDay}, {yr}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: milestoneColor(selEvents[0]?.type || "") }}>
+                  {relativeTime(`${yr}-${String(month).padStart(2, "0")}-${String(selDay).padStart(2, "0")}`)}
+                </div>
                 <div className="text-[11px] mt-0.5" style={{ color: "var(--color-t2)" }}>{selEvents.length} catalyst{selEvents.length !== 1 ? "s" : ""} scheduled</div>
               </div>
               <button onClick={() => setSelDay(null)} className="rounded-md w-7 h-7 flex items-center justify-center text-sm cursor-pointer"
@@ -228,9 +269,9 @@ export default function CatalystsPage() {
             {selEvents.map((ev, i) => (
               <Link key={i} href={`/drugs/${ev.drugId}`}
                 className="block p-2.5 mb-2 rounded-lg transition-colors cursor-pointer"
-                style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd)" }}>
+                style={{ background: "var(--color-b2)", border: `1px solid ${milestoneColor(ev.type)}25` }}>
                 <div className="flex justify-between items-start mb-1.5">
-                  <span className="text-[9px] font-bold rounded px-1.5 py-0.5" style={{ color: catTypeColor(ev.type), background: `${catTypeColor(ev.type)}15`, border: `1px solid ${catTypeColor(ev.type)}30` }}>{ev.type}</span>
+                  <span className="text-[9px] font-bold rounded px-1.5 py-0.5" style={{ color: milestoneColor(ev.type), background: `${milestoneColor(ev.type)}15`, border: `1px solid ${milestoneColor(ev.type)}30` }}>{ev.type}</span>
                   <span className="text-[8px] font-semibold" style={{ color: mcTierColor(ev.tier) }}>{ev.tier} Cap</span>
                 </div>
                 <div className="text-[13px] font-bold mb-[3px]">{ev.drugName}</div>
@@ -267,7 +308,7 @@ export default function CatalystsPage() {
           <table className="w-full border-collapse text-[10px]">
             <thead>
               <tr style={{ background: "var(--color-b2)", position: "sticky", top: 0, zIndex: 2 }}>
-                {["Date", "Type", "Drug", "Company", "Phase", "Tier", "Indication"].map((h) => (
+                {["Date", "When", "Type", "Drug", "Company", "Phase", "Tier", "Indication"].map((h) => (
                   <th key={h} className="text-left font-semibold uppercase tracking-wider font-mono whitespace-nowrap"
                     style={{ padding: "6px 8px", color: "var(--color-t2)", fontSize: 8, borderBottom: "1px solid var(--color-bd)" }}>{h}</th>
                 ))}
@@ -276,14 +317,16 @@ export default function CatalystsPage() {
             <tbody>
               {listEvents.map((r, i) => {
                 const isPastEvent = r.date < todayStr;
+                const mc = milestoneColor(r.type);
                 return (
                   <tr key={i} onClick={() => window.location.href = `/drugs/${r.drugId}`} className="cursor-pointer transition-colors"
                     style={{ opacity: isPastEvent ? 0.45 : 1 }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                     <td className="font-mono font-semibold text-[9px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-ac)" }}>{r.date}</td>
+                    <td className="font-mono text-[9px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: mc }}>{relativeTime(r.date)}</td>
                     <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}>
-                      <span className="text-[8px] font-semibold rounded px-[5px] py-px" style={{ color: catTypeColor(r.type), background: `${catTypeColor(r.type)}12` }}>{r.type}</span>
+                      <span className="text-[8px] font-semibold rounded px-[5px] py-px" style={{ color: mc, background: `${mc}12` }}>{r.type}</span>
                     </td>
                     <td className="whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-a2)" }}>{r.drugName}</td>
                     <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", maxWidth: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--color-t1)" }}>{r.companyName}</td>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { DB, PH, TGT, IND, pC, mcTier, mcTierColor } from "@/lib/biovault-data";
+import { milestoneColor, relativeTime } from "@/lib/catalyst-utils";
 
 const coMap = new Map(DB.companies.map((c) => [c.id, c]));
 import BioCard from "@/components/ui/BioCard";
@@ -139,7 +140,7 @@ export default function DashboardPage() {
         <table className="w-full border-collapse text-[10px]">
           <thead>
             <tr style={{ background: "var(--color-b2)", position: "sticky", top: 0, zIndex: 2 }}>
-              {["Date", "Company", "Drug", "Type", "Phase", "Indication"].map((h) => (
+              {["Date", "When", "Company", "Drug", "Type", "Phase", "Indication"].map((h) => (
                 <th key={h} className="text-left font-semibold uppercase tracking-wider font-mono whitespace-nowrap"
                   style={{ padding: "6px 8px", color: "var(--color-t2)", fontSize: 8, borderBottom: "1px solid var(--color-bd)" }}>{h}</th>
               ))}
@@ -148,35 +149,21 @@ export default function DashboardPage() {
           <tbody>
             {DB.catalysts.slice(0, 25).map((c) => {
               const drug = DB.drugs.find((d) => d.id === c.drugId);
-              const catColor: Record<string, { bg: string; fg: string }> = {
-                "PDUFA": { bg: "#ef535020", fg: "#ff6b6b" },
-                "NDA": { bg: "#f48fb120", fg: "#f48fb1" },
-                "EMA Filing": { bg: "#ce93d820", fg: "#ce93d8" },
-                "AdCom": { bg: "#ef535020", fg: "#ff6b6b" },
-                "Ph3 Readout": { bg: "#ffb74d20", fg: "#ffb74d" },
-                "Ph2 Data": { bg: "#81c78420", fg: "#81c784" },
-                "Ph1 Dose Esc": { bg: "#4fc3f720", fg: "#4fc3f7" },
-                "Conference": { bg: "#64b5f620", fg: "#64b5f6" },
-                "Interim": { bg: "#fff17620", fg: "#fff176" },
-                "BTD": { bg: "#00f5b020", fg: "#00f5b0" },
-                "Fast Track": { bg: "#00f5b020", fg: "#00f5b0" },
-                "Orphan Drug": { bg: "#00f5b020", fg: "#00f5b0" },
-                "Enrollment Complete": { bg: "#b0bec520", fg: "#b0bec5" },
-              };
-              const tc = catColor[c.type] || { bg: "var(--color-b3)", fg: "var(--color-t1)" };
+              const mc = milestoneColor(c.type);
               return (
                 <tr key={c.id} onClick={() => window.location.href = `/drugs/${c.drugId}`}
                   className="cursor-pointer transition-colors"
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                   <td className="font-mono text-[9px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-ac)" }}>{c.date}</td>
+                  <td className="font-mono text-[9px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: mc }}>{relativeTime(c.date)}</td>
                   <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     <Link href={`/companies/${c.companyId}`} onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color: mcTierColor(mcTier(coMap.get(c.companyId)?.marketCap ?? null)) }}>{c.companyName}</Link>
                   </td>
                   <td className="font-semibold whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t0)" }}>{c.drugName}</td>
                   <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}>
                     <span className="inline-block rounded text-[8px] font-semibold font-mono whitespace-nowrap"
-                      style={{ padding: "1px 6px", background: tc.bg, color: tc.fg, border: `1px solid ${tc.fg}33` }}>
+                      style={{ padding: "1px 6px", background: `${mc}20`, color: mc, border: `1px solid ${mc}33` }}>
                       {c.type}
                     </span>
                   </td>
