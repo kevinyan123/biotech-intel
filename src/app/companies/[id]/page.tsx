@@ -130,8 +130,9 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         <SectionHeader>SEC Filings & Financial Documents</SectionHeader>
         <div className="rounded-lg mb-4" style={{ border: "1px solid var(--color-bd)", maxHeight: 260, overflowY: "auto", background: "var(--color-b1)" }}>
           {filings.map((f, i) => {
-            const q = encodeURIComponent(co.ticker || co.name);
-            const edgarUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${q}&type=${encodeURIComponent(f.type)}&dateb=&owner=include&count=10&search_text=&action=getcompany`;
+            const edgarUrl = co.ticker
+              ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(co.ticker)}&type=${encodeURIComponent(f.type)}&dateb=&owner=include&count=10`
+              : `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${encodeURIComponent(co.name)}&type=${encodeURIComponent(f.type)}&dateb=&owner=include&count=10`;
             return (
               <a key={i} href={edgarUrl} target="_blank" rel="noopener noreferrer"
                 className="flex items-start gap-2.5 px-3.5 py-2.5 cursor-pointer transition-colors no-underline"
