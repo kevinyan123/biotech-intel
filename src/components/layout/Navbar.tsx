@@ -9,6 +9,7 @@ const navItems = [
   { label: "Pipeline", href: "/drugs" },
   { label: "Trials", href: "/trials" },
   { label: "Catalysts", href: "/catalysts" },
+  { label: "Calendar", href: "/calendar" },
   { label: "Targets", href: "/targets" },
   { label: "Diseases", href: "/diseases" },
 ];
@@ -32,7 +33,7 @@ export default function Navbar() {
           <span className="font-serif font-[800] text-[15px] tracking-tight whitespace-nowrap">KBY Biotech Index</span>
           <span className="text-[7px] font-mono font-semibold px-[3px] rounded-sm border"
             style={{ color: "var(--color-ac)", background: "var(--color-acd)", borderColor: "rgba(0,223,162,0.15)" }}>
-            v0.0.12
+            v0.0.13
           </span>
         </Link>
 
@@ -66,7 +67,7 @@ export default function Navbar() {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <span className="hidden sm:inline">Search 600+ orgs…</span>
+          <span className="hidden sm:inline">Search 1100+ orgs…</span>
           <span className="sm:hidden">Search</span>
           <span className="ml-auto text-[7px] font-mono opacity-40 hidden sm:inline">⌘K</span>
         </Link>
