@@ -101,12 +101,14 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
           trialsByStage[idx].push(t);
         });
 
-        // Get earliest year for each stage that has trials
-        const stageYears: Record<number, string> = {};
+        // Get date range for each stage that has trials
+        const MO = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const fmtDate = (d: string) => { const [y, m] = d.split("-"); return `${MO[parseInt(m)]} ${y}`; };
+        const stageDates: Record<number, { start: string; end: string }> = {};
         Object.entries(trialsByStage).forEach(([idx, trials]) => {
           const earliest = trials.reduce((best, t) => t.startDate < best ? t.startDate : best, trials[0].startDate);
-          // startDate is YYYY-MM format
-          stageYears[Number(idx)] = earliest.split("-")[0];
+          const latest = trials.reduce((best, t) => t.estCompletion > best ? t.estCompletion : best, trials[0].estCompletion);
+          stageDates[Number(idx)] = { start: earliest, end: latest };
         });
 
         return (
@@ -130,7 +132,7 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
                   const isCurrent = i === currentIdx;
                   const isFuture = i > currentIdx;
                   const trials = trialsByStage[i] || [];
-                  const year = stageYears[i];
+                  const dates = stageDates[i];
 
                   // Aggregate tooltip data
                   const totalEnrollment = trials.reduce((sum, t) => sum + t.enrollment, 0);
@@ -203,13 +205,23 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
                         }}>
                           {stage.label}
                         </div>
-                        {/* Year label */}
-                        {year && (
-                          <div className="text-[8px] font-mono mt-px" style={{
-                            color: isCompleted ? "#546e7a" : isCurrent ? "#4fc3f7" : "var(--color-t2)",
-                            opacity: isCompleted ? 0.7 : isCurrent ? 0.9 : 0.4,
-                          }}>
-                            {year}
+                        {/* Date labels */}
+                        {dates && (
+                          <div className="mt-px">
+                            <div className="text-[7px] font-mono" style={{
+                              color: isCompleted ? "#90a4ae" : isCurrent ? "#4fc3f7" : "var(--color-t2)",
+                              opacity: isCurrent ? 0.9 : isCompleted ? 0.8 : 0.4,
+                            }}>
+                              {fmtDate(dates.start)}
+                            </div>
+                            {(isCompleted || isCurrent) && dates.start !== dates.end && (
+                              <div className="text-[6px] font-mono" style={{
+                                color: isCompleted ? "#78909c" : "#4fc3f7",
+                                opacity: 0.6,
+                              }}>
+                                → {fmtDate(dates.end)}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
