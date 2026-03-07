@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useMemo } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { DB, mcTier, mcTierColor } from "@/lib/biovault-data";
 import BioCard from "@/components/ui/BioCard";
@@ -18,76 +18,12 @@ const fColor = (t: string) => {
   return "var(--color-t2)";
 };
 
-// Cache ticker→CIK map so we only fetch once per session
-let tickerMapCache: Record<string, number> | null = null;
-
 interface Filing {
   type: string;
   title: string;
   date: string;
   url: string;
-  real: boolean;
-}
-
-async function fetchRealFilings(ticker: string): Promise<Filing[]> {
-  try {
-    if (!tickerMapCache) {
-      const res = await fetch("https://www.sec.gov/files/company_tickers.json");
-      if (!res.ok) return [];
-      const data = await res.json();
-      const map: Record<string, number> = {};
-      Object.values(data).forEach((e: any) => {
-        if (e.ticker) map[e.ticker.toUpperCase()] = e.cik_str;
-      });
-      tickerMapCache = map;
-    }
-
-    const cik = tickerMapCache[ticker.toUpperCase()];
-    if (!cik) return [];
-
-    const paddedCIK = String(cik).padStart(10, "0");
-    const res2 = await fetch(`https://data.sec.gov/submissions/CIK${paddedCIK}.json`);
-    if (!res2.ok) return [];
-    const sub = await res2.json();
-
-    if (!sub?.filings?.recent) return [];
-    const r = sub.filings.recent;
-
-    const wanted = new Set(["10-K", "10-Q", "8-K", "DEF 14A", "S-1", "S-1/A", "S-3", "20-F", "6-K"]);
-    const results: Filing[] = [];
-
-    for (let i = 0; i < r.form.length && results.length < 12; i++) {
-      if (wanted.has(r.form[i])) {
-        const accClean = r.accessionNumber[i].replace(/-/g, "");
-        results.push({
-          type: r.form[i],
-          title: r.primaryDocDescription[i] || r.form[i],
-          date: r.filingDate[i],
-          url: `https://www.sec.gov/Archives/edgar/data/${cik}/${accClean}/${r.primaryDocument[i]}`,
-          real: true,
-        });
-      }
-    }
-
-    return results;
-  } catch {
-    return [];
-  }
-}
-
-// Generate fallback filings for companies not found in SEC
-function generateFallbackFilings(companyName: string, ticker: string | null): Filing[] {
-  const edgarSearch = `https://www.sec.gov/cgi-bin/browse-edgar?company=${encodeURIComponent(companyName)}&CIK=&type=&dateb=&owner=include&count=40&search_text=&action=getcompany`;
-  return [
-    { type: "10-K", title: "Annual Report FY2025", date: "2026-02-28", url: edgarSearch, real: false },
-    { type: "10-Q", title: "Q4 2025 Quarterly Report", date: "2026-01-15", url: edgarSearch, real: false },
-    { type: "8-K", title: "Material Event Disclosure", date: "2026-01-08", url: edgarSearch, real: false },
-    { type: "10-Q", title: "Q3 2025 Quarterly Report", date: "2025-10-12", url: edgarSearch, real: false },
-    { type: "8-K", title: "Clinical Trial Results Announcement", date: "2025-09-22", url: edgarSearch, real: false },
-    { type: "8-K", title: "Partnership Agreement", date: "2025-08-15", url: edgarSearch, real: false },
-    { type: "DEF 14A", title: "2025 Proxy Statement", date: "2025-04-20", url: edgarSearch, real: false },
-    { type: "10-K", title: "Annual Report FY2024", date: "2025-02-27", url: edgarSearch, real: false },
-  ];
+  accession?: string;
 }
 
 export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -102,27 +38,27 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   const approved = dr.filter((d) => (d.highestPhase || d.phase) === "Approved").length;
   const failed = tr.filter((t) => t.status === "Terminated").length;
 
-  const fallbackFilings = useMemo(() => co.isPublic ? generateFallbackFilings(co.name, co.ticker) : [], [co.isPublic, co.name, co.ticker]);
-
   const [filings, setFilings] = useState<Filing[]>([]);
   const [filingsLoading, setFilingsLoading] = useState(false);
-  const [tried, setTried] = useState(false);
+  const [secFound, setSecFound] = useState<boolean | null>(null);
+  const [secCompany, setSecCompany] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!co.isPublic || !co.ticker) {
-      setTried(true);
-      return;
-    }
+    if (!co.isPublic || !co.ticker) return;
     setFilingsLoading(true);
-    fetchRealFilings(co.ticker)
-      .then((f) => setFilings(f))
-      .catch(() => {})
-      .finally(() => { setFilingsLoading(false); setTried(true); });
-  }, [co.isPublic, co.ticker]);
 
-  // Use real filings if found, otherwise use fallback
-  const displayFilings = filings.length > 0 ? filings : (tried ? fallbackFilings : []);
-  const isRealData = filings.length > 0;
+    fetch(`/api/sec?ticker=${encodeURIComponent(co.ticker)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setFilings(data.filings || []);
+        setSecFound(data.found ?? false);
+        setSecCompany(data.company || null);
+      })
+      .catch(() => {
+        setSecFound(false);
+      })
+      .finally(() => setFilingsLoading(false));
+  }, [co.isPublic, co.ticker]);
 
   return (
     <div style={{ animation: "fi .2s ease-out" }}>
@@ -216,36 +152,42 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         </table>
       </div>
 
-      {/* SEC Filings */}
+      {/* SEC Filings — fetched server-side via /api/sec */}
       {co.isPublic && <>
         <SectionHeader>SEC Filings & Financial Documents</SectionHeader>
+
+        {/* Loading state */}
         {filingsLoading && (
           <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
-            <div className="text-xs" style={{ color: "var(--color-t2)" }}>Loading filings from SEC EDGAR...</div>
+            <div className="text-xs" style={{ color: "var(--color-t2)" }}>
+              <span className="inline-block animate-pulse">Fetching filings from SEC EDGAR...</span>
+            </div>
           </BioCard>
         )}
-        {!filingsLoading && displayFilings.length > 0 && (
+
+        {/* Real filings found — every link goes directly to the filing document */}
+        {!filingsLoading && filings.length > 0 && (
           <>
-            {!isRealData && (
-              <div className="text-[9px] mb-1.5" style={{ color: "var(--color-t2)" }}>
-                Links open SEC EDGAR company search for {co.name}
+            {secCompany && (
+              <div className="text-[9px] mb-1.5 flex items-center gap-1.5" style={{ color: "var(--color-t2)" }}>
+                <span className="inline-block w-[5px] h-[5px] rounded-full" style={{ background: "#00e676" }} />
+                SEC EDGAR: {secCompany} — {filings.length} filings · Direct document links
               </div>
             )}
             <div className="rounded-lg mb-4" style={{ border: "1px solid var(--color-bd)", maxHeight: 300, overflowY: "auto", background: "var(--color-b1)" }}>
-              {displayFilings.map((f, i) => (
+              {filings.map((f, i) => (
                 <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
                   className="flex items-start gap-2.5 px-3.5 py-2.5 cursor-pointer transition-colors no-underline"
-                  style={{ borderBottom: i < displayFilings.length - 1 ? "1px solid var(--color-bd)" : "none", display: "flex", color: "inherit" }}
+                  style={{ borderBottom: i < filings.length - 1 ? "1px solid var(--color-bd)" : "none", display: "flex", color: "inherit" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                   <span className="font-mono text-[10px] font-bold min-w-[52px] px-1.5 py-0.5 rounded text-center shrink-0"
                     style={{ color: fColor(f.type), background: `${fColor(f.type)}12`, border: `1px solid ${fColor(f.type)}25` }}>{f.type}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold mb-0.5">{f.title}</div>
-                    {f.real
-                      ? <div className="text-[9px] font-mono truncate" style={{ color: "var(--color-t2)" }}>{f.url.split("/").pop()}</div>
-                      : <div className="text-[9px]" style={{ color: "var(--color-t2)" }}>Search on SEC EDGAR</div>
-                    }
+                    <div className="text-[8px] font-mono truncate" style={{ color: "var(--color-t2)" }}>
+                      {f.url.replace("https://www.sec.gov/Archives/edgar/data/", "edgar/…/")}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: "var(--color-t2)" }}>{f.date}</span>
@@ -255,6 +197,27 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
               ))}
             </div>
           </>
+        )}
+
+        {/* Ticker not found in SEC — no filings to show */}
+        {!filingsLoading && filings.length === 0 && secFound === false && (
+          <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+            <div className="text-xs mb-1.5" style={{ color: "var(--color-t2)" }}>
+              Ticker <span className="font-mono font-semibold">{co.ticker}</span> not found in SEC EDGAR.
+            </div>
+            <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>
+              This company may file under a different name or jurisdiction.
+            </div>
+          </BioCard>
+        )}
+
+        {/* Ticker found but no matching filing types */}
+        {!filingsLoading && filings.length === 0 && secFound === true && (
+          <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+            <div className="text-xs" style={{ color: "var(--color-t2)" }}>
+              No recent 10-K, 10-Q, or 8-K filings found for <span className="font-mono font-semibold">{co.ticker}</span>.
+            </div>
+          </BioCard>
         )}
       </>}
 
