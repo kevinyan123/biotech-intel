@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id               Int             @id @default(autoincrement())
+  name             String
+  ticker           String?
+  description      String?
+  scientificFocus  String?
+  therapeuticAreas String?
+  founded          String?
+  headquarters     String?
+  website          String?
+  marketCap        Float?
+  stockPrice       Float?
+  employees        Int?
+  ceo              String?
+  investors        String?
+  logoUrl          String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  drugs            Drug[]
+  trials           ClinicalTrial[]
+  financials       FinancialData[]
+  publications     CompanyPublication[]
+}
+
+model Drug {
+  id                Int          @id @default(autoincrement())
+  name              String
+  genericName       String?
+  drugClass         String?
+  mechanismOfAction String?
+  therapeuticArea   String?
+  developmentStage  String?
+  regulatoryStatus  String?
+  approvalDate      String?
+  description       String?
+  companyId         Int
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  company           Company      @relation(fields: [companyId], references: [id])
+  trials            DrugTrial[]
+}
+
+model ClinicalTrial {
+  id              Int          @id @default(autoincrement())
+  nctId           String       @unique
+  title           String
+  phase           String?
+  status          String?
+  conditions      String?
+  interventions   String?
+  sponsors        String?
+  startDate       String?
+  completionDate  String?
+  enrollment      Int?
+  studyType       String?
+  locations       String?
+  resultsAvailable Boolean     @default(false)
+  briefSummary    String?
+  eligibility     String?
+  companyId       Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  company         Company?     @relation(fields: [companyId], references: [id])
+  drugs           DrugTrial[]
+  publications    TrialPublication[]
+}
+
+model Publication {
+  id          Int          @id @default(autoincrement())
+  pmid        String?      @unique
+  title       String
+  authors     String?
+  journal     String?
+  publishDate String?
+  abstract    String?
+  doi         String?
+  createdAt   DateTime     @default(now())
+
+  trials      TrialPublication[]
+  companies   CompanyPublication[]
+}
+
+model FinancialData {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  date        String
+  revenue     Float?
+  netIncome   Float?
+  marketCap   Float?
+  stockPrice  Float?
+  volume      Int?
+  createdAt   DateTime @default(now())
+
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, date])
+}
+
+model DrugTrial {
+  drugId  Int
+  trialId Int
+
+  drug    Drug          @relation(fields: [drugId], references: [id])
+  trial   ClinicalTrial @relation(fields: [trialId], references: [id])
+
+  @@id([drugId, trialId])
+}
+
+model TrialPublication {
+  trialId       Int
+  publicationId Int
+
+  trial         ClinicalTrial @relation(fields: [trialId], references: [id])
+  publication   Publication   @relation(fields: [publicationId], references: [id])
+
+  @@id([trialId, publicationId])
+}
+
+model CompanyPublication {
+  companyId     Int
+  publicationId Int
+
+  company       Company     @relation(fields: [companyId], references: [id])
+  publication   Publication @relation(fields: [publicationId], references: [id])
+
+  @@id([companyId, publicationId])
+}
