@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { DB, mcTier, mcTierColor } from "@/lib/biovault-data";
 import BioCard from "@/components/ui/BioCard";
@@ -8,7 +8,73 @@ import PhaseBadge from "@/components/ui/PhaseBadge";
 import Tag from "@/components/ui/Tag";
 import SectionHeader from "@/components/ui/SectionHeader";
 
-const fColor = (t: string) => ({ "10-K": "#4fc3f7", "10-Q": "#81c784", "8-K": "#ffb74d", "DEF 14A": "#ce93d8", "S-1/A": "#f48fb1" }[t] || "var(--color-t2)");
+const fColor = (t: string) => {
+  if (t.startsWith("10-K")) return "#4fc3f7";
+  if (t.startsWith("10-Q")) return "#81c784";
+  if (t.startsWith("8-K")) return "#ffb74d";
+  if (t.includes("DEF") || t.includes("14A")) return "#ce93d8";
+  if (t.startsWith("S-1") || t.startsWith("S-3")) return "#f48fb1";
+  if (t.startsWith("20-F") || t.startsWith("6-K")) return "#80deea";
+  return "var(--color-t2)";
+};
+
+// Cache ticker→CIK map so we only fetch it once per session
+let tickerMapCache: Record<string, number> | null = null;
+
+interface SECFiling {
+  type: string;
+  title: string;
+  date: string;
+  url: string;
+}
+
+async function fetchRealFilings(ticker: string): Promise<SECFiling[]> {
+  try {
+    // Step 1: Get ticker → CIK mapping (cached)
+    if (!tickerMapCache) {
+      const res = await fetch("https://www.sec.gov/files/company_tickers.json");
+      if (!res.ok) return [];
+      const data = await res.json();
+      const map: Record<string, number> = {};
+      Object.values(data).forEach((e: any) => {
+        if (e.ticker) map[e.ticker.toUpperCase()] = e.cik_str;
+      });
+      tickerMapCache = map;
+    }
+
+    const cik = tickerMapCache[ticker.toUpperCase()];
+    if (!cik) return [];
+
+    // Step 2: Fetch the company's submissions (all filings)
+    const paddedCIK = String(cik).padStart(10, "0");
+    const res2 = await fetch(`https://data.sec.gov/submissions/CIK${paddedCIK}.json`);
+    if (!res2.ok) return [];
+    const sub = await res2.json();
+
+    if (!sub?.filings?.recent) return [];
+    const r = sub.filings.recent;
+
+    // Step 3: Extract filings with direct document URLs
+    const wanted = new Set(["10-K", "10-Q", "8-K", "DEF 14A", "S-1", "S-1/A", "S-3", "20-F", "6-K"]);
+    const results: SECFiling[] = [];
+
+    for (let i = 0; i < r.form.length && results.length < 12; i++) {
+      if (wanted.has(r.form[i])) {
+        const accClean = r.accessionNumber[i].replace(/-/g, "");
+        results.push({
+          type: r.form[i],
+          title: r.primaryDocDescription[i] || r.form[i],
+          date: r.filingDate[i],
+          url: `https://www.sec.gov/Archives/edgar/data/${cik}/${accClean}/${r.primaryDocument[i]}`,
+        });
+      }
+    }
+
+    return results;
+  } catch {
+    return [];
+  }
+}
 
 export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,16 +88,22 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   const approved = dr.filter((d) => (d.highestPhase || d.phase) === "Approved").length;
   const failed = tr.filter((t) => t.status === "Terminated").length;
 
-  const filings = co.isPublic ? [
-    { type: "10-K", title: "Annual Report FY2025", date: "2026-02-28", desc: "Annual financial statements and business overview" },
-    { type: "10-Q", title: "Q4 2025 Quarterly Report", date: "2026-01-15", desc: "Quarterly financial results" },
-    { type: "8-K", title: "Phase 3 Topline Results Announcement", date: "2026-01-08", desc: "Material event disclosure — clinical trial results" },
-    { type: "10-Q", title: "Q3 2025 Quarterly Report", date: "2025-10-12", desc: "Quarterly financial results" },
-    { type: "8-K", title: "FDA Breakthrough Therapy Designation", date: "2025-09-22", desc: "Material event — regulatory milestone" },
-    { type: "8-K", title: "Licensing Agreement Announcement", date: "2025-08-15", desc: "Partnership and licensing deal terms" },
-    { type: "DEF 14A", title: "2025 Proxy Statement", date: "2025-04-20", desc: "Annual meeting proxy and executive compensation" },
-    { type: "10-K", title: "Annual Report FY2024", date: "2025-02-27", desc: "Annual financial statements and business overview" },
-  ] : [];
+  // Real SEC filings fetched from EDGAR API
+  const [filings, setFilings] = useState<SECFiling[]>([]);
+  const [filingsLoading, setFilingsLoading] = useState(false);
+  const [filingsError, setFilingsError] = useState(false);
+
+  useEffect(() => {
+    if (!co.isPublic || !co.ticker) return;
+    setFilingsLoading(true);
+    fetchRealFilings(co.ticker)
+      .then((f) => {
+        setFilings(f);
+        if (f.length === 0) setFilingsError(true);
+      })
+      .catch(() => setFilingsError(true))
+      .finally(() => setFilingsLoading(false));
+  }, [co.isPublic, co.ticker]);
 
   return (
     <div style={{ animation: "fi .2s ease-out" }}>
@@ -125,16 +197,18 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         </table>
       </div>
 
-      {/* SEC Filings */}
-      {co.isPublic && filings.length > 0 && <>
+      {/* SEC Filings — fetched live from EDGAR */}
+      {co.isPublic && <>
         <SectionHeader>SEC Filings & Financial Documents</SectionHeader>
-        <div className="rounded-lg mb-4" style={{ border: "1px solid var(--color-bd)", maxHeight: 260, overflowY: "auto", background: "var(--color-b1)" }}>
-          {filings.map((f, i) => {
-            const edgarUrl = co.ticker
-              ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(co.ticker)}&type=${encodeURIComponent(f.type)}&dateb=&owner=include&count=10`
-              : `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${encodeURIComponent(co.name)}&type=${encodeURIComponent(f.type)}&dateb=&owner=include&count=10`;
-            return (
-              <a key={i} href={edgarUrl} target="_blank" rel="noopener noreferrer"
+        {filingsLoading && (
+          <BioCard style={{ padding: 20, textAlign: "center" }}>
+            <div className="text-xs" style={{ color: "var(--color-t2)" }}>Loading filings from SEC EDGAR...</div>
+          </BioCard>
+        )}
+        {!filingsLoading && filings.length > 0 && (
+          <div className="rounded-lg mb-4" style={{ border: "1px solid var(--color-bd)", maxHeight: 300, overflowY: "auto", background: "var(--color-b1)" }}>
+            {filings.map((f, i) => (
+              <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
                 className="flex items-start gap-2.5 px-3.5 py-2.5 cursor-pointer transition-colors no-underline"
                 style={{ borderBottom: i < filings.length - 1 ? "1px solid var(--color-bd)" : "none", display: "flex", color: "inherit" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
@@ -143,16 +217,23 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                   style={{ color: fColor(f.type), background: `${fColor(f.type)}12`, border: `1px solid ${fColor(f.type)}25` }}>{f.type}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold mb-0.5">{f.title}</div>
-                  <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>{f.desc}</div>
+                  <div className="text-[9px] font-mono truncate" style={{ color: "var(--color-t2)" }}>{f.url.split("/").pop()}</div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: "var(--color-t2)" }}>{f.date}</span>
                   <span className="text-[10px]" style={{ color: "var(--color-a2)" }}>↗</span>
                 </div>
               </a>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
+        {!filingsLoading && filings.length === 0 && (
+          <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+            <div className="text-xs" style={{ color: "var(--color-t2)" }}>
+              {filingsError ? "No SEC filings found for this ticker." : "Loading..."}
+            </div>
+          </BioCard>
+        )}
       </>}
 
       {!co.isPublic && (
