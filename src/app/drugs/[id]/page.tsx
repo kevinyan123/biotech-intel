@@ -69,6 +69,225 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
         {(d.allIndications || d.indications).map((x, i) => <Tag key={i} color="var(--color-a2)">{x}</Tag>)}
       </div>
 
+      {/* Development Pipeline */}
+      {(() => {
+        const STAGES = [
+          { key: "Preclinical", label: "Preclinical", short: "Pre" },
+          { key: "Phase 1", label: "Phase 1", short: "P1" },
+          { key: "Phase 2", label: "Phase 2", short: "P2" },
+          { key: "Phase 3", label: "Phase 3", short: "P3" },
+          { key: "NDA/BLA", label: "NDA/BLA", short: "NDA" },
+          { key: "Approved", label: "Approved", short: "App" },
+        ];
+
+        // Map any phase string to its pipeline stage index
+        const stageIndex = (ph: string): number => {
+          if (ph === "Approved") return 5;
+          if (ph === "NDA/BLA") return 4;
+          if (ph === "Phase 3") return 3;
+          if (ph === "Phase 2/3" || ph === "Phase 2") return 2;
+          if (ph === "Phase 1/2" || ph === "Phase 1") return 1;
+          return 0; // Preclinical
+        };
+
+        const currentPhase = d.highestPhase || d.phase;
+        const currentIdx = stageIndex(currentPhase);
+
+        // Map trials to pipeline stages for tooltip data
+        const trialsByStage: Record<number, typeof tr> = {};
+        tr.forEach((t) => {
+          const idx = stageIndex(t.phase);
+          if (!trialsByStage[idx]) trialsByStage[idx] = [];
+          trialsByStage[idx].push(t);
+        });
+
+        // Get earliest year for each stage that has trials
+        const stageYears: Record<number, string> = {};
+        Object.entries(trialsByStage).forEach(([idx, trials]) => {
+          const earliest = trials.reduce((best, t) => t.startDate < best ? t.startDate : best, trials[0].startDate);
+          // startDate is YYYY-MM format
+          stageYears[Number(idx)] = earliest.split("-")[0];
+        });
+
+        return (
+          <>
+            <SectionHeader>Development Pipeline</SectionHeader>
+            <BioCard className="mb-3.5">
+              <div className="flex items-center justify-between relative px-2 py-3">
+                {/* Connecting line behind everything */}
+                <div className="absolute top-1/2 left-[24px] right-[24px] h-[2px] -translate-y-[5px]" style={{ background: "var(--color-bd)" }}>
+                  {/* Filled portion up to current stage */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, height: "100%",
+                    width: `${(currentIdx / (STAGES.length - 1)) * 100}%`,
+                    background: "linear-gradient(90deg, #546e7a, #4fc3f7)",
+                    borderRadius: 1,
+                  }} />
+                </div>
+
+                {STAGES.map((stage, i) => {
+                  const isCompleted = i < currentIdx;
+                  const isCurrent = i === currentIdx;
+                  const isFuture = i > currentIdx;
+                  const trials = trialsByStage[i] || [];
+                  const year = stageYears[i];
+
+                  // Aggregate tooltip data
+                  const totalEnrollment = trials.reduce((sum, t) => sum + t.enrollment, 0);
+                  const indications = [...new Set(trials.map(t => t.indication))];
+                  const statuses = [...new Set(trials.map(t => t.status))];
+
+                  return (
+                    <div key={stage.key} className="flex flex-col items-center relative z-10 group/stage" style={{ flex: 1 }}>
+                      {/* Milestone marker */}
+                      <div className="relative">
+                        <div style={{
+                          width: isCurrent ? 22 : 16,
+                          height: isCurrent ? 22 : 16,
+                          borderRadius: "50%",
+                          background: isCompleted
+                            ? "#546e7a"
+                            : isCurrent
+                            ? "#4fc3f7"
+                            : "var(--color-b1)",
+                          border: isFuture
+                            ? "2px dashed var(--color-bd)"
+                            : isCurrent
+                            ? "3px solid #4fc3f7"
+                            : "2px solid #546e7a",
+                          boxShadow: isCurrent
+                            ? "0 0 12px #4fc3f755, 0 0 24px #4fc3f722"
+                            : "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.2s ease",
+                        }}>
+                          {/* Inner icon */}
+                          {isCompleted && (
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                              <path d="M2.5 6L5 8.5L9.5 4" stroke="#b0bec5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                          {isCurrent && (
+                            <div style={{
+                              width: 8, height: 8, borderRadius: "50%",
+                              background: "#fff",
+                              boxShadow: "0 0 6px #4fc3f766",
+                            }} />
+                          )}
+                          {isFuture && (
+                            <div style={{
+                              width: 6, height: 6, borderRadius: "50%",
+                              background: "var(--color-bd)",
+                              opacity: 0.5,
+                            }} />
+                          )}
+                        </div>
+
+                        {/* Pulse ring for current */}
+                        {isCurrent && (
+                          <div style={{
+                            position: "absolute", top: -4, left: -4, right: -4, bottom: -4,
+                            borderRadius: "50%", border: "1px solid #4fc3f733",
+                            animation: "pulse 2s ease-in-out infinite",
+                          }} />
+                        )}
+                      </div>
+
+                      {/* Stage label */}
+                      <div className="mt-2 text-center">
+                        <div className="text-[9px] font-semibold font-mono" style={{
+                          color: isCompleted ? "#546e7a" : isCurrent ? "#4fc3f7" : "var(--color-t2)",
+                          opacity: isFuture ? 0.45 : 1,
+                        }}>
+                          {stage.label}
+                        </div>
+                        {/* Year label */}
+                        {year && (
+                          <div className="text-[8px] font-mono mt-px" style={{
+                            color: isCompleted ? "#546e7a" : isCurrent ? "#4fc3f7" : "var(--color-t2)",
+                            opacity: isCompleted ? 0.7 : isCurrent ? 0.9 : 0.4,
+                          }}>
+                            {year}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Hover tooltip */}
+                      {(trials.length > 0 || isCurrent) && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 rounded-lg px-3 py-2.5 pointer-events-none opacity-0 group-hover/stage:opacity-100 transition-opacity z-20"
+                          style={{
+                            background: "var(--color-b3)",
+                            border: `1px solid ${isCurrent ? "#4fc3f744" : "var(--color-bd)"}`,
+                            minWidth: 180,
+                            boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                          }}>
+                          <div className="text-[10px] font-bold mb-1.5" style={{ color: isCurrent ? "#4fc3f7" : isCompleted ? "#546e7a" : "var(--color-t2)" }}>
+                            {stage.label}
+                            {isCurrent && <span className="ml-1.5 text-[8px] font-normal px-1 py-px rounded" style={{ background: "#4fc3f720", color: "#4fc3f7" }}>Current</span>}
+                            {isCompleted && <span className="ml-1.5 text-[8px] font-normal px-1 py-px rounded" style={{ background: "#546e7a20", color: "#90a4ae" }}>Completed</span>}
+                          </div>
+                          {trials.length > 0 ? (
+                            <>
+                              {trials.slice(0, 3).map((t, ti) => (
+                                <div key={ti} className="py-1" style={{ borderTop: ti > 0 ? "1px solid var(--color-bd)" : "none" }}>
+                                  <div className="text-[9px] font-mono font-semibold" style={{ color: "var(--color-a2)" }}>{t.nctId}</div>
+                                  <div className="flex gap-1.5 text-[8px] mt-0.5" style={{ color: "var(--color-t2)" }}>
+                                    <span>{t.enrollment.toLocaleString()} pts</span>
+                                    <span>·</span>
+                                    <span>{t.indication}</span>
+                                  </div>
+                                  <div className="flex gap-1.5 text-[8px] mt-0.5" style={{ color: "var(--color-t2)" }}>
+                                    <span>{t.startDate}</span>
+                                    <span>→</span>
+                                    <span>{t.estCompletion}</span>
+                                    <span>·</span>
+                                    <span style={{ color: t.status === "Recruiting" || t.status === "Active" ? "#00e676" : t.status === "Completed" ? "#64b5f6" : t.status === "Terminated" ? "#ff6b6b" : "var(--color-t2)" }}>{t.status}</span>
+                                  </div>
+                                </div>
+                              ))}
+                              {trials.length > 3 && (
+                                <div className="text-[8px] mt-1 font-mono" style={{ color: "var(--color-t2)" }}>+{trials.length - 3} more trial{trials.length - 3 > 1 ? "s" : ""}</div>
+                              )}
+                              <div className="mt-1 pt-1 flex gap-2 text-[8px]" style={{ borderTop: "1px solid var(--color-bd)" }}>
+                                <span style={{ color: "var(--color-ac)" }}>{totalEnrollment.toLocaleString()} total pts</span>
+                                <span style={{ color: "var(--color-t2)" }}>{indications.length} indication{indications.length !== 1 ? "s" : ""}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-[9px]" style={{ color: "var(--color-t2)" }}>No trials in this phase yet</div>
+                          )}
+                          {/* Arrow */}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                            style={{ borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `5px solid ${isCurrent ? "#4fc3f744" : "var(--color-bd)"}` }} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Summary line */}
+              <div className="flex justify-center gap-3 mt-1 text-[8px]" style={{ color: "var(--color-t2)" }}>
+                <span className="flex items-center gap-1">
+                  <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: "#546e7a", border: "1.5px solid #546e7a" }} />
+                  Completed
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-[8px] h-[8px] rounded-full inline-block" style={{ background: "#4fc3f7", border: "2px solid #4fc3f7", boxShadow: "0 0 4px #4fc3f755" }} />
+                  <span style={{ color: "#4fc3f7" }}>Current</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: "transparent", border: "1.5px dashed var(--color-bd)" }} />
+                  Upcoming
+                </span>
+              </div>
+            </BioCard>
+          </>
+        );
+      })()}
+
       {/* Catalysts */}
       {cat.length > 0 && <>
         <SectionHeader>Catalysts ({cat.length})</SectionHeader>
