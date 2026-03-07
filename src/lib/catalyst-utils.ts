@@ -61,3 +61,31 @@ export const MILESTONE_LEGEND = [
   { label: "Data Readout", color: "#ffb74d" },
   { label: "FDA / Regulatory", color: "#f48fb1" },
 ] as const;
+
+/**
+ * Chart marker color scheme (for stock chart overlay):
+ *   Red    #ff6b6b — FDA / regulatory
+ *   Blue   #64b5f6 — Clinical trial results / readouts
+ *   Green  #00e676 — Enrollment milestones
+ *   Yellow #ffab66 — Other (conferences, dose esc, etc.)
+ */
+export function chartMarkerColor(type: string): string {
+  if (/PDUFA|NDA|EMA|BTD|Fast|Orphan|AdCom/.test(type)) return "#ff6b6b";
+  if (/Ph2|Phase 2|Ph3|Phase 3|Interim/.test(type)) return "#64b5f6";
+  if (/Enrollment|Recruiting/.test(type)) return "#00e676";
+  return "#ffab66";
+}
+
+export function chartMarkerCategory(type: string): string {
+  if (/PDUFA|NDA|EMA|BTD|Fast|Orphan|AdCom/.test(type)) return "regulatory";
+  if (/Ph2|Phase 2|Ph3|Phase 3|Interim/.test(type)) return "results";
+  if (/Enrollment|Recruiting/.test(type)) return "enrollment";
+  return "other";
+}
+
+export const CHART_MARKER_LEGEND = [
+  { label: "FDA / Regulatory", color: "#ff6b6b", key: "regulatory" },
+  { label: "Data Readout", color: "#64b5f6", key: "results" },
+  { label: "Enrollment", color: "#00e676", key: "enrollment" },
+  { label: "Other", color: "#ffab66", key: "other" },
+] as const;

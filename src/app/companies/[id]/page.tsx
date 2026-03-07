@@ -7,6 +7,7 @@ import BioCard from "@/components/ui/BioCard";
 import PhaseBadge from "@/components/ui/PhaseBadge";
 import Tag from "@/components/ui/Tag";
 import SectionHeader from "@/components/ui/SectionHeader";
+import StockChart from "@/components/company/StockChart";
 
 const fColor = (t: string) => {
   if (t.startsWith("10-K")) return "#4fc3f7";
@@ -120,6 +121,21 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           </BioCard>
         ))}
       </div>
+
+      {/* Stock Price Chart — public companies only */}
+      {co.isPublic && co.ticker && co.marketCap && (
+        <>
+          <SectionHeader>Stock Price & Catalysts ({co.ticker})</SectionHeader>
+          <BioCard className="mb-4" style={{ padding: 16 }}>
+            <StockChart
+              companyId={co.id}
+              ticker={co.ticker}
+              marketCap={co.marketCap}
+              catalysts={cat}
+            />
+          </BioCard>
+        </>
+      )}
 
       {/* Drug Pipeline Table */}
       <SectionHeader>Drug Pipeline ({dr.length} programs)</SectionHeader>
