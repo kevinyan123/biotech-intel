@@ -104,12 +104,38 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
         // Get date range for each stage that has trials
         const MO = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const fmtDate = (d: string) => { const [y, m] = d.split("-"); return `${MO[parseInt(m)]} ${y}`; };
-        const stageDates: Record<number, { start: string; end: string }> = {};
+        const shiftMonths = (d: string, n: number) => {
+          const [y, m] = d.split("-").map(Number);
+          const total = y * 12 + (m - 1) + n;
+          const ny = Math.floor(total / 12);
+          const nm = (total % 12) + 1;
+          return `${ny}-${String(nm).padStart(2, "0")}`;
+        };
+        const stageDates: Record<number, { start: string; end: string; estimated?: boolean }> = {};
         Object.entries(trialsByStage).forEach(([idx, trials]) => {
           const earliest = trials.reduce((best, t) => t.startDate < best ? t.startDate : best, trials[0].startDate);
           const latest = trials.reduce((best, t) => t.estCompletion > best ? t.estCompletion : best, trials[0].estCompletion);
           stageDates[Number(idx)] = { start: earliest, end: latest };
         });
+
+        // Fill in estimated dates for completed stages without trial data
+        // Work backwards: for missing completed stages, estimate from the next known stage
+        for (let i = currentIdx; i >= 0; i--) {
+          if (!stageDates[i]) {
+            // Find the next stage that has a date
+            let nextWithDate = -1;
+            for (let j = i + 1; j <= currentIdx; j++) {
+              if (stageDates[j]) { nextWithDate = j; break; }
+            }
+            if (nextWithDate >= 0) {
+              // Estimate: each prior stage ~18 months before the next stage's start
+              const gap = nextWithDate - i;
+              const estEnd = shiftMonths(stageDates[nextWithDate].start, -3);
+              const estStart = shiftMonths(stageDates[nextWithDate].start, -18 * gap);
+              stageDates[i] = { start: estStart, end: estEnd, estimated: true };
+            }
+          }
+        }
 
         return (
           <>
@@ -211,15 +237,17 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
                             <div className="text-[7px] font-mono" style={{
                               color: isCompleted ? "#90a4ae" : isCurrent ? "#4fc3f7" : "var(--color-t2)",
                               opacity: isCurrent ? 0.9 : isCompleted ? 0.8 : 0.4,
+                              fontStyle: dates.estimated ? "italic" : "normal",
                             }}>
-                              {fmtDate(dates.start)}
+                              {dates.estimated ? "~" : ""}{fmtDate(dates.start)}
                             </div>
                             {(isCompleted || isCurrent) && dates.start !== dates.end && (
                               <div className="text-[6px] font-mono" style={{
                                 color: isCompleted ? "#78909c" : "#4fc3f7",
                                 opacity: 0.6,
+                                fontStyle: dates.estimated ? "italic" : "normal",
                               }}>
-                                → {fmtDate(dates.end)}
+                                → {dates.estimated ? "~" : ""}{fmtDate(dates.end)}
                               </div>
                             )}
                           </div>
