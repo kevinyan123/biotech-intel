@@ -129,20 +129,28 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
       {co.isPublic && filings.length > 0 && <>
         <SectionHeader>SEC Filings & Financial Documents</SectionHeader>
         <div className="rounded-lg mb-4" style={{ border: "1px solid var(--color-bd)", maxHeight: 260, overflowY: "auto", background: "var(--color-b1)" }}>
-          {filings.map((f, i) => (
-            <div key={i} className="flex items-start gap-2.5 px-3.5 py-2.5 cursor-pointer transition-colors"
-              style={{ borderBottom: i < filings.length - 1 ? "1px solid var(--color-bd)" : "none" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-              <span className="font-mono text-[10px] font-bold min-w-[52px] px-1.5 py-0.5 rounded text-center shrink-0"
-                style={{ color: fColor(f.type), background: `${fColor(f.type)}12`, border: `1px solid ${fColor(f.type)}25` }}>{f.type}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold mb-0.5">{f.title}</div>
-                <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>{f.desc}</div>
-              </div>
-              <span className="font-mono text-[10px] whitespace-nowrap shrink-0" style={{ color: "var(--color-t2)" }}>{f.date}</span>
-            </div>
-          ))}
+          {filings.map((f, i) => {
+            const q = encodeURIComponent(co.ticker || co.name);
+            const edgarUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${q}&type=${encodeURIComponent(f.type)}&dateb=&owner=include&count=10&search_text=&action=getcompany`;
+            return (
+              <a key={i} href={edgarUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-start gap-2.5 px-3.5 py-2.5 cursor-pointer transition-colors no-underline"
+                style={{ borderBottom: i < filings.length - 1 ? "1px solid var(--color-bd)" : "none", display: "flex", color: "inherit" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                <span className="font-mono text-[10px] font-bold min-w-[52px] px-1.5 py-0.5 rounded text-center shrink-0"
+                  style={{ color: fColor(f.type), background: `${fColor(f.type)}12`, border: `1px solid ${fColor(f.type)}25` }}>{f.type}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold mb-0.5">{f.title}</div>
+                  <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>{f.desc}</div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: "var(--color-t2)" }}>{f.date}</span>
+                  <span className="text-[10px]" style={{ color: "var(--color-a2)" }}>↗</span>
+                </div>
+              </a>
+            );
+          })}
         </div>
       </>}
 
