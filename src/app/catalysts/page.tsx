@@ -13,23 +13,39 @@ const catTypeColor = (t: string) => {
   if (t.includes("Ph2") || t.includes("Phase 2")) return "#81c784";
   if (t.includes("BTD") || t.includes("Fast") || t.includes("Orphan")) return "#ce93d8";
   if (t.includes("Conference")) return "#4fc3f7";
+  if (t.includes("Interim")) return "#aed581";
+  if (t.includes("AdCom")) return "#ff8a65";
+  if (t.includes("Enrollment")) return "#90caf9";
   return "var(--color-a3)";
 };
 
 export default function CatalystsPage() {
-  const [month, setMonth] = useState(3);
+  const now = new Date();
+  const todayYear = now.getFullYear();
+  const todayMonth = now.getMonth() + 1;
+  const todayDay = now.getDate();
+
+  const [month, setMonth] = useState(todayMonth);
   const [mcF, setMcF] = useState<string | null>(null);
   const [phF, setPhF] = useState<string | null>(null);
   const [typeF, setTypeF] = useState<string | null>(null);
   const [selDay, setSelDay] = useState<number | null>(null);
+  const [listMode, setListMode] = useState<"upcoming" | "all">("upcoming");
 
-  const types = useMemo(() => [...new Set(DB.catalysts.map((c) => c.type))], []);
+  const types = useMemo(() => {
+    const ts = [...new Set(DB.catalysts.map((c) => c.type))];
+    ts.sort();
+    return ts;
+  }, []);
+
+  const coMap = useMemo(() => new Map(DB.companies.map(c => [c.id, c])), []);
+  const drugMap = useMemo(() => new Map(DB.drugs.map(d => [d.id, d])), []);
 
   const enriched = useMemo(() => DB.catalysts.map((c) => {
-    const co = DB.companies.find((x) => x.id === c.companyId);
-    const drug = DB.drugs.find((x) => x.id === c.drugId);
+    const co = coMap.get(c.companyId);
+    const drug = drugMap.get(c.drugId);
     return { ...c, tier: co ? mcTier(co.marketCap) : "Private", drugPhase: drug ? (drug.highestPhase || drug.phase) : "Unknown", mc: co?.marketCap ?? null };
-  }), []);
+  }), [coMap, drugMap]);
 
   const filtered = useMemo(() => {
     let d = enriched;
@@ -50,19 +66,36 @@ export default function CatalystsPage() {
   const eventsByDay: Record<number, typeof filtered> = {};
   monthEvents.forEach((c) => { const d = parseInt(c.date.split("-")[2]); if (!eventsByDay[d]) eventsByDay[d] = []; eventsByDay[d].push(c); });
   const selEvents = selDay ? eventsByDay[selDay] || [] : [];
-  const today = 6;
+
+  // Upcoming events: from today onwards
+  const todayStr = `${todayYear}-${String(todayMonth).padStart(2, "0")}-${String(todayDay).padStart(2, "0")}`;
+  const upcomingEvents = useMemo(() => filtered.filter(c => c.date >= todayStr), [filtered, todayStr]);
+  const listEvents = listMode === "upcoming" ? upcomingEvents : filtered;
+
+  // Stats
+  const uniqueCos = new Set(filtered.map(c => c.companyId)).size;
+  const upcomingCount = upcomingEvents.length;
 
   return (
     <div style={{ animation: "fi .2s ease-out" }}>
-      <h2 className="text-lg font-bold mb-1">Catalyst Calendar</h2>
-      <p className="text-[11px] mb-1.5" style={{ color: "var(--color-t2)" }}>
-        {filtered.length} events across {new Set(filtered.map((c) => c.companyId)).size} companies
-      </p>
+      <div className="flex items-start justify-between mb-1 flex-wrap gap-2">
+        <div>
+          <h2 className="text-lg font-bold">Catalyst Calendar</h2>
+          <p className="text-[11px]" style={{ color: "var(--color-t2)" }}>
+            {filtered.length} total events · {upcomingCount} upcoming · {uniqueCos} companies
+          </p>
+        </div>
+        <button onClick={() => { setMonth(todayMonth); setSelDay(null); }}
+          className="rounded-[5px] px-2.5 py-[5px] text-[10px] font-semibold cursor-pointer transition-all"
+          style={{ background: "var(--color-acd)", color: "var(--color-ac)", border: "1px solid rgba(0,223,162,0.2)" }}>
+          Today
+        </button>
+      </div>
 
       {/* Legend */}
       <div className="flex gap-2.5 mb-3.5 text-[9px] flex-wrap items-center" style={{ color: "var(--color-t2)" }}>
         <span className="font-semibold">Legend:</span>
-        {[["PDUFA / NDA / EMA", "#f48fb1"], ["Phase 3 Readout", "#ffb74d"], ["Phase 2 Data", "#81c784"], ["Regulatory", "#ce93d8"], ["Conference", "#4fc3f7"], ["Other", "var(--color-a3)"]].map(([label, color], i) => (
+        {[["PDUFA / NDA / EMA", "#f48fb1"], ["Phase 3 Readout", "#ffb74d"], ["Phase 2 Data", "#81c784"], ["Regulatory", "#ce93d8"], ["Conference", "#4fc3f7"], ["AdCom", "#ff8a65"], ["Interim / Enrollment", "#90caf9"]].map(([label, color], i) => (
           <span key={i} className="inline-flex items-center gap-[3px]">
             <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: color, boxShadow: `0 0 4px ${color}55` }} />
             {label}
@@ -102,7 +135,7 @@ export default function CatalystsPage() {
         <div>
           <div className="text-[8px] font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--color-t2)" }}>Event Type</div>
           <div className="flex gap-[3px] flex-wrap">
-            {types.slice(0, 8).map((t) => (
+            {types.map((t) => (
               <button key={t} onClick={() => setTypeF(typeF === t ? null : t)}
                 className="rounded-[5px] px-[9px] py-[3px] text-[9px] cursor-pointer transition-all"
                 style={{ background: typeF === t ? `${catTypeColor(t)}15` : "transparent", border: `1px solid ${typeF === t ? catTypeColor(t) + "44" : "var(--color-bd)"}`, color: typeF === t ? catTypeColor(t) : "var(--color-t2)", fontWeight: typeF === t ? 600 : 400 }}>
@@ -140,7 +173,8 @@ export default function CatalystsPage() {
                 const dayNum = w * 7 + d - firstDow + 1;
                 const isValid = dayNum >= 1 && dayNum <= daysInMonth;
                 const events = isValid ? eventsByDay[dayNum] || [] : [];
-                const isToday = month === 3 && dayNum === today;
+                const isToday = yr === todayYear && month === todayMonth && dayNum === todayDay;
+                const isPast = yr < todayYear || (yr === todayYear && (month < todayMonth || (month === todayMonth && dayNum < todayDay)));
                 const isSel = dayNum === selDay;
 
                 return (
@@ -150,7 +184,7 @@ export default function CatalystsPage() {
                       minHeight: 76, padding: 5, cursor: isValid ? "pointer" : "default",
                       background: isSel ? "rgba(0,223,162,0.08)" : isToday ? "rgba(77,166,232,0.06)" : "var(--color-b1)",
                       border: `1px solid ${isSel ? "rgba(0,223,162,0.25)" : isToday ? "rgba(77,166,232,0.2)" : "var(--color-bd)"}`,
-                      opacity: isValid ? 1 : 0.1,
+                      opacity: isValid ? (isPast ? 0.5 : 1) : 0.1,
                     }}>
                     {isValid && <>
                       <div className="flex justify-between items-center mb-1">
@@ -158,10 +192,10 @@ export default function CatalystsPage() {
                         {events.length > 0 && <span className="text-[9px] font-mono font-bold rounded px-1" style={{ color: "var(--color-ac)", background: "rgba(0,223,162,0.12)" }}>{events.length}</span>}
                       </div>
                       <div className="flex flex-wrap gap-0.5 mb-[3px]">
-                        {events.slice(0, 5).map((ev, i) => (
+                        {events.slice(0, 6).map((ev, i) => (
                           <div key={i} className="w-[7px] h-[7px] rounded-full" style={{ background: catTypeColor(ev.type), boxShadow: `0 0 4px ${catTypeColor(ev.type)}66` }} />
                         ))}
-                        {events.length > 5 && <span className="text-[7px]" style={{ color: "var(--color-t2)" }}>+{events.length - 5}</span>}
+                        {events.length > 6 && <span className="text-[7px]" style={{ color: "var(--color-t2)" }}>+{events.length - 6}</span>}
                       </div>
                       {events.length > 0 && (
                         <div className="text-[8px] leading-tight">
@@ -216,35 +250,52 @@ export default function CatalystsPage() {
       </div>
 
       {/* Full List */}
-      <SectionHeader>All Events ({filtered.length})</SectionHeader>
-      <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--color-bd)", maxHeight: 300, overflowY: "auto" }}>
-        <table className="w-full border-collapse text-[10px]">
-          <thead>
-            <tr style={{ background: "var(--color-b2)", position: "sticky", top: 0, zIndex: 2 }}>
-              {["Date", "Type", "Drug", "Company", "Phase", "Tier", "Indication"].map((h) => (
-                <th key={h} className="text-left font-semibold uppercase tracking-wider font-mono whitespace-nowrap"
-                  style={{ padding: "6px 8px", color: "var(--color-t2)", fontSize: 8, borderBottom: "1px solid var(--color-bd)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r, i) => (
-              <tr key={i} onClick={() => window.location.href = `/drugs/${r.drugId}`} className="cursor-pointer transition-colors"
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                <td className="font-mono font-semibold text-[9px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-ac)" }}>{r.date}</td>
-                <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}>
-                  <span className="text-[8px] font-semibold rounded px-[5px] py-px" style={{ color: catTypeColor(r.type), background: `${catTypeColor(r.type)}12` }}>{r.type}</span>
-                </td>
-                <td className="whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-a2)" }}>{r.drugName}</td>
-                <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", maxWidth: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--color-t1)" }}>{r.companyName}</td>
-                <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}><PhaseBadge phase={r.drugPhase} small /></td>
-                <td className="text-[8px] font-semibold" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: mcTierColor(r.tier) }}>{r.tier}</td>
-                <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t1)" }}>{r.indication}</td>
-              </tr>
+      <div className="mt-4">
+        <div className="flex items-center justify-between mb-2">
+          <SectionHeader>{listMode === "upcoming" ? `Upcoming Events (${upcomingCount})` : `All Events (${filtered.length})`}</SectionHeader>
+          <div className="flex gap-[3px]">
+            {(["upcoming", "all"] as const).map((m) => (
+              <button key={m} onClick={() => setListMode(m)}
+                className="rounded-[5px] px-[9px] py-[3px] text-[9px] cursor-pointer transition-all capitalize"
+                style={{ background: listMode === m ? "var(--color-acd)" : "transparent", border: `1px solid ${listMode === m ? "rgba(0,223,162,0.2)" : "var(--color-bd)"}`, color: listMode === m ? "var(--color-ac)" : "var(--color-t2)", fontWeight: listMode === m ? 600 : 400 }}>
+                {m}
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--color-bd)", maxHeight: 400, overflowY: "auto" }}>
+          <table className="w-full border-collapse text-[10px]">
+            <thead>
+              <tr style={{ background: "var(--color-b2)", position: "sticky", top: 0, zIndex: 2 }}>
+                {["Date", "Type", "Drug", "Company", "Phase", "Tier", "Indication"].map((h) => (
+                  <th key={h} className="text-left font-semibold uppercase tracking-wider font-mono whitespace-nowrap"
+                    style={{ padding: "6px 8px", color: "var(--color-t2)", fontSize: 8, borderBottom: "1px solid var(--color-bd)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {listEvents.map((r, i) => {
+                const isPastEvent = r.date < todayStr;
+                return (
+                  <tr key={i} onClick={() => window.location.href = `/drugs/${r.drugId}`} className="cursor-pointer transition-colors"
+                    style={{ opacity: isPastEvent ? 0.45 : 1 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bh)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                    <td className="font-mono font-semibold text-[9px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-ac)" }}>{r.date}</td>
+                    <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}>
+                      <span className="text-[8px] font-semibold rounded px-[5px] py-px" style={{ color: catTypeColor(r.type), background: `${catTypeColor(r.type)}12` }}>{r.type}</span>
+                    </td>
+                    <td className="whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-a2)" }}>{r.drugName}</td>
+                    <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", maxWidth: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--color-t1)" }}>{r.companyName}</td>
+                    <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}><PhaseBadge phase={r.drugPhase} small /></td>
+                    <td className="text-[8px] font-semibold" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: mcTierColor(r.tier) }}>{r.tier}</td>
+                    <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t1)" }}>{r.indication}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

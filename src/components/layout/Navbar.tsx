@@ -9,7 +9,6 @@ const navItems = [
   { label: "Pipeline", href: "/drugs" },
   { label: "Trials", href: "/trials" },
   { label: "Catalysts", href: "/catalysts" },
-  { label: "Calendar", href: "/calendar" },
   { label: "Targets", href: "/targets" },
   { label: "Diseases", href: "/diseases" },
 ];

@@ -1651,7 +1651,8 @@ function buildDB(): BioVaultDB {
   });
 
   const catalysts: Catalyst[] = [];
-  const catCount = Math.min(500, Math.max(150, ~~(drugs.length * 0.06)));
+  // Scale catalysts with dataset size — more companies = more events
+  const catCount = Math.min(900, Math.max(250, ~~(drugs.length * 0.15)));
   for (let i = 0; i < catCount; i++) {
     const d = pk(drugs);
     catalysts.push({
@@ -1666,6 +1667,26 @@ function buildDB(): BioVaultDB {
       indication: pk(d.indications),
     });
   }
+  // Add trial completion milestones for trials completing in 2026
+  let milestoneId = catCount;
+  trials.forEach(t => {
+    if (t.estCompletion && t.estCompletion.startsWith("2026")) {
+      const drug = drugs.find(d => d.id === t.drugId);
+      if (drug) {
+        catalysts.push({
+          id: `k${milestoneId++}`,
+          date: `${t.estCompletion}-${String(ri(1, 28)).padStart(2, "0")}`,
+          type: t.phase.includes("3") ? "Ph3 Readout" : t.phase.includes("2") ? "Ph2 Data" : "Enrollment Complete",
+          drugId: drug.id,
+          drugCode: drug.code,
+          drugName: drug.name || drug.code,
+          companyId: drug.companyId,
+          companyName: drug.companyName,
+          indication: t.indication,
+        });
+      }
+    }
+  });
   catalysts.sort((a, b) => a.date.localeCompare(b.date));
 
   return { companies, drugs, trials, catalysts };
