@@ -24,6 +24,46 @@ const fmtFull = (ts: number) => { const d = new Date(ts); return `${MO[d.getMont
 
 const DATA_READOUT_COLOR = "#64b5f6";
 
+/* ── currency formatting ─────────────────────────────────────────── */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", JPY: "¥", KRW: "₩",
+  CNY: "¥", HKD: "HK$", CHF: "CHF ", SEK: "kr", DKK: "kr",
+  CAD: "CA$", AUD: "A$", SGD: "S$", TWD: "NT$", INR: "₹",
+  ILS: "₪", BRL: "R$",
+};
+const NO_DECIMAL_CURRENCIES = new Set(["KRW", "JPY", "TWD"]);
+
+function getCurrencySymbol(currency: string): string {
+  return CURRENCY_SYMBOLS[currency] || currency + " ";
+}
+
+/** Format price for display — uses locale-aware formatting */
+function fmtPrice(value: number, currency: string): string {
+  const sym = getCurrencySymbol(currency);
+  const noDecimal = NO_DECIMAL_CURRENCIES.has(currency);
+  if (noDecimal) {
+    return `${sym}${Math.round(value).toLocaleString()}`;
+  }
+  return `${sym}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Compact format for Y-axis labels */
+function fmtAxisPrice(value: number, currency: string): string {
+  const sym = getCurrencySymbol(currency);
+  if (Math.abs(value) >= 1_000_000) return `${sym}${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 10_000) return `${sym}${(value / 1_000).toFixed(0)}K`;
+  if (Math.abs(value) >= 1_000) return `${sym}${(value / 1_000).toFixed(1)}K`;
+  const noDecimal = NO_DECIMAL_CURRENCIES.has(currency);
+  return noDecimal ? `${sym}${Math.round(value).toLocaleString()}` : `${sym}${value.toFixed(0)}`;
+}
+
+/** Format price change */
+function fmtChange(value: number, currency: string): string {
+  const noDecimal = NO_DECIMAL_CURRENCIES.has(currency);
+  if (noDecimal) return Math.round(value).toLocaleString();
+  return value.toFixed(2);
+}
+
 /**
  * Linearly interpolate (or snap) the price at `target` using a sorted
  * array of {ts,price} candles.  If the target falls on a non-trading day
@@ -108,6 +148,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
   const [error, setError] = useState<string | null>(null);
   const [stockName, setStockName] = useState<string | null>(null);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<string>("USD");
 
   useEffect(() => {
     setLoading(true);
@@ -122,6 +163,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
           setAllData(data.prices.map((p: any) => ({ ts: toTs(p.date), price: p.price })));
           setStockName(data.name || null);
           setCurrentPrice(data.currentPrice || null);
+          setCurrency(data.currency || "USD");
         }
       })
       .catch(() => { setError("Failed to fetch stock data"); setAllData([]); })
@@ -205,7 +247,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
       <div style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, maxWidth: 260 }}>
         <div className="font-mono text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>{fmtFull(ts)}</div>
         {price != null && (
-          <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>${price.toFixed(2)}</div>
+          <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>{fmtPrice(price, currency)}</div>
         )}
         {dayCats.map((c, i) => {
           const catData = catalysts.find(cat => cat.id === c.id);
@@ -222,7 +264,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
               <div className="text-[9px] font-semibold mt-0.5" style={{ color: "var(--color-t0)" }}>{c.drugName}</div>
               <div className="text-[8px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
               <div className="text-[8px] font-mono" style={{ color: DATA_READOUT_COLOR }}>
-                {fmtFull(c.ts)} · ${c.price.toFixed(2)} · {relativeTime(c.date)}
+                {fmtFull(c.ts)} · {fmtPrice(c.price, currency)} · {relativeTime(c.date)}
               </div>
               {catData?.readoutSource && (
                 <div className="text-[7px] font-mono mt-0.5" style={{ color: "var(--color-t2)" }}>
@@ -267,15 +309,19 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
       {/* Price header */}
       <div className="flex items-baseline gap-2.5 mb-3">
         {currentPrice && (
-          <span className="font-mono font-bold text-[20px]" style={{ color: "var(--color-t0)" }}>${currentPrice.toFixed(2)}</span>
+          <span className="font-mono font-bold text-[20px]" style={{ color: "var(--color-t0)" }}>{fmtPrice(currentPrice, currency)}</span>
         )}
         {priceChange && (
           <span className="font-mono text-[11px] font-semibold" style={{ color: priceChange.isUp ? "#00e676" : "#ff6b6b" }}>
-            {priceChange.isUp ? "+" : ""}{priceChange.change.toFixed(2)} ({priceChange.isUp ? "+" : ""}{priceChange.pct.toFixed(1)}%)
+            {priceChange.isUp ? "+" : ""}{fmtChange(priceChange.change, currency)} ({priceChange.isUp ? "+" : ""}{priceChange.pct.toFixed(1)}%)
             <span className="font-normal ml-1" style={{ color: "var(--color-t2)" }}>{timeRange}</span>
           </span>
         )}
-        {stockName && <span className="text-[9px] ml-auto" style={{ color: "var(--color-t2)" }}>{stockName}</span>}
+        {stockName && (
+          <span className="text-[9px] ml-auto" style={{ color: "var(--color-t2)" }}>
+            {stockName}{currency !== "USD" ? ` · ${currency}` : ""}
+          </span>
+        )}
       </div>
 
       {/* Time range + legend */}
@@ -316,11 +362,11 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
               tickCount={8}
             />
             <YAxis
-              tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+              tickFormatter={(v: number) => fmtAxisPrice(v, currency)}
               stroke="#7e92a6" fontSize={8} fontFamily="JetBrains Mono, monospace"
               tickLine={false} axisLine={false}
               domain={[Math.floor(minP - pad), Math.ceil(maxP + pad)]}
-              width={45}
+              width={NO_DECIMAL_CURRENCIES.has(currency) && maxP > 10000 ? 60 : 50}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#7e92a644", strokeDasharray: "3 3" }} />
 
