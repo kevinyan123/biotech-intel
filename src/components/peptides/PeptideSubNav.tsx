@@ -14,7 +14,7 @@ export default function PeptideHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-[36px] z-40 border-b backdrop-blur-xl -mx-3 px-3"
+    <header className="sticky top-0 z-50 border-b backdrop-blur-xl -mx-3 px-3"
       style={{ background: "var(--color-b1)ee", borderColor: "var(--color-bd)" }}>
       <div className="flex items-center gap-3 h-11 overflow-x-auto scrollbar-hide"
         style={{ WebkitOverflowScrolling: "touch" }}>
@@ -63,6 +63,22 @@ export default function PeptideHeader() {
               </Link>
             );
           })}
+
+          {/* Divider before Biotech */}
+          <div className="h-4 w-px shrink-0 self-center mx-1" style={{ background: "var(--color-bd)" }} />
+
+          {/* Biotech nav item — returns to main site */}
+          <Link
+            href="/"
+            className="px-2.5 py-[3px] rounded text-[10px] font-medium transition-colors whitespace-nowrap shrink-0"
+            style={{
+              background: "transparent",
+              color: "var(--color-ac)",
+              border: "1px solid rgba(0,245,176,0.15)",
+            }}
+          >
+            Biotech
+          </Link>
         </nav>
       </div>
     </header>
