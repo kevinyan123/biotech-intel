@@ -7,7 +7,6 @@ const sectionNavItems = [
   { label: "Overview", href: "/peptides", exact: true },
   { label: "Dictionary", href: "/peptides/dictionary" },
   { label: "Targets", href: "/peptides/targets" },
-  { label: "Manufacturers", href: "/peptides/manufacturers" },
 ];
 
 export default function PeptideHeader() {

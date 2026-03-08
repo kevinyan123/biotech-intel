@@ -47,7 +47,7 @@ export default function PeptidesHub() {
           Peptide <span style={{ color: "var(--color-a2)" }}>Therapeutics Research</span>
         </h1>
         <p className="text-[11px]" style={{ color: "var(--color-t2)" }}>
-          {stats.total} peptides · {stats.approved} approved · {stats.targets} targets · {stats.mfgs} manufacturers
+          {stats.total} peptides · {stats.approved} approved · {stats.targets} targets
         </p>
       </div>
 
@@ -58,7 +58,6 @@ export default function PeptidesHub() {
           ["Approved", stats.approved],
           ["In Pipeline", stats.pipeline],
           ["Targets", stats.targets],
-          ["Manufacturers", stats.mfgs],
           ["Avg MW (Da)", stats.avgMW.toLocaleString()],
         ] as const).map(([label, value], i) => (
           <BioCard key={label} style={{ animation: `fi .3s ease-out ${i * 0.03}s both` }}>
@@ -72,7 +71,7 @@ export default function PeptidesHub() {
 
       {/* Category Cards */}
       <SectionHeader>Explore</SectionHeader>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-[7px] mb-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[7px] mb-3.5">
         <PeptideCategoryCard
           title="Peptide Dictionary"
           count={PDB.peptides.length}
@@ -88,14 +87,6 @@ export default function PeptidesHub() {
           href="/peptides/targets"
           icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64b5f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>}
           preview={PDB.targets.filter(t => t.peptideIds.length > 0).sort((a, b) => b.peptideIds.length - a.peptideIds.length).slice(0, 3).map(t => `${t.name} — ${t.peptideIds.length} peptides`)}
-        />
-        <PeptideCategoryCard
-          title="Manufacturers"
-          count={PDB.manufacturers.length}
-          description="Peptide API manufacturers, CDMOs, and research suppliers worldwide."
-          href="/peptides/manufacturers"
-          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64b5f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><path d="M9 20v-4h6v4"/></svg>}
-          preview={PDB.manufacturers.sort((a, b) => b.peptideIds.length - a.peptideIds.length).slice(0, 3).map(m => `${m.name} — ${m.type}`)}
         />
       </div>
 
