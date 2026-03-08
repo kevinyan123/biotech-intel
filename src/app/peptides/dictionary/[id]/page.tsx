@@ -207,6 +207,16 @@ export default function PeptideDetailPage({ params }: { params: Promise<{ id: st
         </>
       )}
 
+      {/* Side Effects */}
+      {pep.sideEffects && (
+        <>
+          <SectionTitle>Side Effects</SectionTitle>
+          <div className="rounded-lg p-3 mb-1" style={{ background: "var(--color-b1)", border: "1px solid var(--color-bd)" }}>
+            <Prose>{pep.sideEffects}</Prose>
+          </div>
+        </>
+      )}
+
       {/* Research Background */}
       {pep.researchBackground && (
         <>
@@ -298,6 +308,29 @@ export default function PeptideDetailPage({ params }: { params: Promise<{ id: st
                 <span style={{ color: "var(--color-t2)" }}>{d.companyName}</span>
               </Link>
             ))}
+          </div>
+        </>
+      )}
+
+      {/* Sources & References */}
+      {pep.sources.length > 0 && (
+        <>
+          <SectionTitle>Sources &amp; References</SectionTitle>
+          <div className="rounded-lg p-3 mb-1" style={{ background: "var(--color-b1)", border: "1px solid var(--color-bd)" }}>
+            <ol className="space-y-1.5">
+              {pep.sources.map((src, i) => (
+                <li key={i} className="text-[9px] flex items-start gap-1.5" style={{ color: "var(--color-t2)" }}>
+                  <span className="font-mono shrink-0" style={{ color: "var(--color-t2)" }}>[{i + 1}]</span>
+                  <a href={src.url} target="_blank" rel="noopener noreferrer"
+                    className="underline decoration-dotted underline-offset-2 transition-colors"
+                    style={{ color: "var(--color-a2)" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "var(--color-t0)")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "var(--color-a2)")}>
+                    {src.title}
+                  </a>
+                </li>
+              ))}
+            </ol>
           </div>
         </>
       )}

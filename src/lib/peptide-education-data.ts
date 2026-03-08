@@ -3,6 +3,11 @@
 // Keyed by peptide name. Merged into Peptide objects at build time.
 // ═══════════════════════════════════════════════════════════════════════
 
+export interface PeptideSourceRef {
+  title: string;
+  url: string;
+}
+
 export interface PeptideEducationalData {
   primaryBenefit: string;
   shortSummary: string;
@@ -522,5 +527,272 @@ export const PEPTIDE_EDUCATION: Record<string, PeptideEducationalData> = {
     safetyNotes: "FDA-approved as Korsuva. Common side effects include diarrhea, dizziness, and gait disturbance. Does not cause typical opioid side effects (euphoria, respiratory depression, dependence) due to lack of CNS penetration.",
     researchBackground: "Developed by Cara Therapeutics. Approved by the FDA in 2021 for CKD-associated pruritus in hemodialysis patients. The KALM-1 and KALM-2 Phase 3 trials demonstrated significant itch reduction versus placebo. Represents a novel approach to treating itch through peripheral opioid mechanisms.",
     relatedPeptideNames: ["Ziconotide"],
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIDE EFFECTS & SOURCES — Supplementary data merged at build time
+// ═══════════════════════════════════════════════════════════════════════
+
+export const PEPTIDE_SUPPLEMENTS: Record<string, { sideEffects: string; sources: PeptideSourceRef[] }> = {
+  "Semaglutide": {
+    sideEffects: "Common side effects include nausea (20-44%), vomiting, diarrhea, constipation, and abdominal pain, particularly during dose escalation. Injection site reactions, headache, and fatigue have been reported. Rare but serious risks include pancreatitis, gallbladder events, and acute kidney injury. Carries a boxed warning for thyroid C-cell tumors observed in rodent studies.",
+    sources: [
+      { title: "STEP 1 Trial — Semaglutide for Weight Management (NEJM, 2021)", url: "https://pubmed.ncbi.nlm.nih.gov/33567185/" },
+      { title: "SELECT Cardiovascular Outcomes Trial (NEJM, 2023)", url: "https://pubmed.ncbi.nlm.nih.gov/37952131/" },
+      { title: "FDA Prescribing Information — Ozempic (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=ozempic" },
+      { title: "Semaglutide Clinical Trials — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=semaglutide" },
+    ],
+  },
+  "Tirzepatide": {
+    sideEffects: "Common side effects include nausea (12-33%), diarrhea, vomiting, constipation, decreased appetite, and injection site reactions. Gastrointestinal effects are generally most pronounced during dose escalation. Rare risks include pancreatitis and gallbladder events. Carries the same thyroid C-cell tumor boxed warning as GLP-1 receptor agonists.",
+    sources: [
+      { title: "SURMOUNT-1 Trial — Tirzepatide for Obesity (NEJM, 2022)", url: "https://pubmed.ncbi.nlm.nih.gov/35658024/" },
+      { title: "FDA Prescribing Information — Mounjaro (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=mounjaro" },
+      { title: "Tirzepatide Clinical Trials — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=tirzepatide" },
+    ],
+  },
+  "BPC-157": {
+    sideEffects: "Human clinical trial data is very limited. Animal studies have reported minimal adverse effects at therapeutic doses. Anecdotal reports from research contexts include nausea, dizziness, and headache. No large-scale human safety trials have been published, so the full side effect profile remains poorly characterized.",
+    sources: [
+      { title: "BPC 157 Pharmacological Effects — Review (Current Pharmaceutical Design)", url: "https://pubmed.ncbi.nlm.nih.gov/?term=BPC-157+stable+gastric+pentadecapeptide+review" },
+      { title: "BPC 157 Tissue Healing Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=BPC-157+healing" },
+      { title: "BPC-157 Studies — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=BPC-157" },
+    ],
+  },
+  "TB-500": {
+    sideEffects: "Limited human clinical data is available. Anecdotal reports from research use include headache, lethargy, nausea, and localized discomfort at injection sites. No large-scale human safety trials have been published. The side effect profile is not well established in peer-reviewed literature.",
+    sources: [
+      { title: "Thymosin Beta-4 in Tissue Repair — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+beta-4+tissue+repair" },
+      { title: "Thymosin Beta-4 Wound Healing Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+beta-4+wound+healing" },
+    ],
+  },
+  "Thymosin Beta-4": {
+    sideEffects: "In limited clinical studies, thymosin beta-4 has been generally well-tolerated. Reported side effects include injection site irritation and mild discomfort. Phase 2 trials in wound healing and dry eye have not identified major safety concerns, though data remains limited.",
+    sources: [
+      { title: "Thymosin Beta-4 Clinical Applications — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+beta-4+clinical+trial" },
+      { title: "Thymosin Beta-4 in Corneal Wound Healing — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+beta-4+corneal+healing" },
+    ],
+  },
+  "Thymosin Alpha-1": {
+    sideEffects: "Generally well-tolerated in clinical use. Reported side effects include injection site reactions (pain, erythema), fatigue, and rash. Rare reports of flu-like symptoms. Extensive clinical use in Asia and Europe for hepatitis and immune support has shown a favorable safety profile.",
+    sources: [
+      { title: "Thymosin Alpha-1 in Hepatitis B — Clinical Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+alpha-1+hepatitis+clinical" },
+      { title: "Thymosin Alpha-1 Immune Modulation — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+alpha-1+immune+modulation" },
+      { title: "Thymosin Alpha-1 Safety Profile — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=thymosin+alpha-1+safety" },
+    ],
+  },
+  "CJC-1295": {
+    sideEffects: "Reported effects in research settings include flushing, warmth, headache, dizziness, water retention, and injection site reactions. Transient numbness or tingling has been noted. No large-scale controlled safety trials have been published. As a GHRH analog, potential risks include those associated with elevated growth hormone levels.",
+    sources: [
+      { title: "CJC-1295 Pharmacokinetics Study — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=CJC-1295+growth+hormone" },
+      { title: "GHRH Analogs in Growth Hormone Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=GHRH+analog+growth+hormone+releasing" },
+    ],
+  },
+  "Ipamorelin": {
+    sideEffects: "Reported effects in research settings include headache, flushing, dizziness, nausea, and injection site reactions. Unlike other growth hormone secretagogues, ipamorelin shows minimal effect on cortisol and prolactin at therapeutic doses. No large-scale human safety trials have been published.",
+    sources: [
+      { title: "Ipamorelin Selectivity as GH Secretagogue — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=ipamorelin+growth+hormone+secretagogue" },
+      { title: "Ipamorelin Clinical Studies — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=ipamorelin" },
+    ],
+  },
+  "AOD-9604": {
+    sideEffects: "Limited human data from phase 2 trials. Reported side effects include injection site reactions and headache. The peptide was generally well-tolerated in available clinical studies, though pivotal trials for obesity were not completed. Long-term safety data is not available.",
+    sources: [
+      { title: "AOD-9604 Fat Metabolism Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=AOD-9604+obesity+fat" },
+      { title: "hGH Fragment 177-191 Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=hGH+fragment+177-191" },
+    ],
+  },
+  "GHK-Cu": {
+    sideEffects: "Topical application is generally well-tolerated with rare reports of skin irritation or redness. Injectable forms have very limited safety data. As a naturally occurring peptide-copper complex found in human plasma, GHK-Cu has not shown significant toxicity in available studies.",
+    sources: [
+      { title: "GHK-Cu Skin Remodeling and Anti-Aging — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=GHK-Cu+copper+peptide+skin" },
+      { title: "GHK Peptide Biological Activity — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=GHK+peptide+wound+healing+review" },
+    ],
+  },
+  "PT-141": {
+    sideEffects: "Common side effects include nausea (40%), flushing (20%), headache, and injection site reactions. Transient increases in blood pressure have been observed. Skin hyperpigmentation may occur with repeated use due to melanocortin receptor activation. Contraindicated in patients with uncontrolled hypertension.",
+    sources: [
+      { title: "FDA Prescribing Information — Vyleesi (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=vyleesi" },
+      { title: "Bremelanotide Clinical Trials — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=bremelanotide" },
+      { title: "Bremelanotide for HSDD — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=bremelanotide+hypoactive+sexual+desire" },
+    ],
+  },
+  "DSIP": {
+    sideEffects: "Very limited human clinical data. Anecdotal reports include drowsiness (expected given its sleep-promoting effects) and headache. The peptide has a very short half-life, which may limit systemic side effects. No large-scale safety studies have been conducted.",
+    sources: [
+      { title: "Delta Sleep-Inducing Peptide Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=delta+sleep+inducing+peptide" },
+      { title: "DSIP Neuromodulation — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=DSIP+sleep+peptide+review" },
+    ],
+  },
+  "Melanotan II": {
+    sideEffects: "Common side effects include nausea (especially during initial use), facial flushing, fatigue, and injection site reactions. A significant safety concern is the darkening of existing moles and nevi, which complicates skin cancer surveillance. Other reported effects include appetite suppression and spontaneous penile erections.",
+    sources: [
+      { title: "Melanotan II Safety Concerns — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=melanotan+II+safety+adverse" },
+      { title: "Melanocortin Agonists and Skin Effects — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=melanotan+skin+pigmentation+safety" },
+    ],
+  },
+  "MOTS-c": {
+    sideEffects: "Very limited human clinical data is available. As an endogenous mitochondrial-derived peptide, it is expected to have a favorable safety profile, though this has not been confirmed in controlled trials. No well-documented side effects from published clinical studies exist.",
+    sources: [
+      { title: "MOTS-c Metabolic Regulation — Original Discovery", url: "https://pubmed.ncbi.nlm.nih.gov/?term=MOTS-c+mitochondrial+derived+peptide+Lee" },
+      { title: "MOTS-c Exercise and Metabolism — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=MOTS-c+metabolism+insulin" },
+    ],
+  },
+  "Kisspeptin": {
+    sideEffects: "In clinical studies, kisspeptin has been generally well-tolerated. Reported side effects include injection site reactions, hot flashes, and headache. As it stimulates GnRH release, hormonal fluctuations (LH, FSH) are expected pharmacological effects rather than adverse events.",
+    sources: [
+      { title: "Kisspeptin in Reproductive Medicine — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=kisspeptin+reproductive+clinical" },
+      { title: "Kisspeptin Clinical Trials — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=kisspeptin" },
+    ],
+  },
+  "Sermorelin": {
+    sideEffects: "Reported side effects include injection site reactions (pain, swelling, redness), facial flushing, headache, dizziness, and hyperactivity. Transient effects on cortisol and prolactin are generally minimal. The drug was FDA-approved (Geref) with an established safety profile, though it has since been discontinued.",
+    sources: [
+      { title: "Sermorelin Growth Hormone Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=sermorelin+growth+hormone+deficiency" },
+      { title: "GHRH Analogs Clinical Use — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=sermorelin+GHRH+analog+clinical" },
+    ],
+  },
+  "Tesamorelin": {
+    sideEffects: "Common side effects include injection site reactions (erythema, pruritus, pain), arthralgia, peripheral edema, and myalgia. May cause fluid retention and joint pain due to growth hormone elevation. Contraindicated in pregnancy due to potential teratogenic effects. May affect glucose metabolism.",
+    sources: [
+      { title: "FDA Prescribing Information — Egrifta (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=egrifta" },
+      { title: "Tesamorelin for HIV Lipodystrophy — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=tesamorelin+HIV+lipodystrophy" },
+      { title: "Tesamorelin Clinical Trials — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=tesamorelin" },
+    ],
+  },
+  "Epitalon": {
+    sideEffects: "Very limited human clinical data. Published studies from Russian research groups report minimal adverse effects, though these studies are limited in scope and sample size. No well-documented side effects from large controlled trials exist. Long-term safety has not been established.",
+    sources: [
+      { title: "Epithalamin and Telomerase Research — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=epitalon+epithalamin+telomerase" },
+      { title: "Pineal Peptides and Aging — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=epithalamin+pineal+peptide+aging" },
+    ],
+  },
+  "LL-37": {
+    sideEffects: "Topical application may cause localized skin irritation or redness. Injectable forms have very limited safety data in humans. At high concentrations, cathelicidins can potentially be cytotoxic to host cells. The peptide's role in inflammatory conditions means immune activation is a theoretical concern.",
+    sources: [
+      { title: "LL-37 Cathelicidin Antimicrobial Functions — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=LL-37+cathelicidin+antimicrobial+review" },
+      { title: "Human Cathelicidin in Innate Immunity — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=cathelicidin+LL-37+innate+immunity" },
+    ],
+  },
+  "Selank": {
+    sideEffects: "Generally well-tolerated in clinical use. Reported side effects include nasal irritation (with intranasal administration), fatigue, and mild drowsiness. No significant adverse effects have been reported in published clinical studies. Has been used clinically in Russia since its approval.",
+    sources: [
+      { title: "Selank Anxiolytic Properties — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=selank+anxiolytic+peptide" },
+      { title: "Selank Pharmacology Review — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=selank+tuftsin+analog+pharmacology" },
+    ],
+  },
+  "Semax": {
+    sideEffects: "Generally well-tolerated. Reported side effects include nasal irritation (intranasal route), bitter taste, and rare headache. No significant adverse effects have been reported in published clinical studies. Has been used clinically in Russia for neuroprotection and cognitive enhancement.",
+    sources: [
+      { title: "Semax Neuroprotective Effects — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=semax+neuroprotective+ACTH+analog" },
+      { title: "Semax Clinical Applications — Review", url: "https://pubmed.ncbi.nlm.nih.gov/?term=semax+cognitive+enhancement+clinical" },
+    ],
+  },
+  "Gonadorelin": {
+    sideEffects: "Common side effects include headache, nausea, abdominal discomfort, flushing, and injection site reactions. In women, ovarian hyperstimulation syndrome is a potential risk when used for fertility treatment. Multiple pregnancy is possible with fertility applications. Light-headedness and dizziness have been reported.",
+    sources: [
+      { title: "FDA Prescribing Information — Gonadorelin (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=gonadorelin" },
+      { title: "GnRH in Reproductive Medicine — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=gonadorelin+GnRH+clinical+use" },
+    ],
+  },
+  "Liraglutide": {
+    sideEffects: "Common side effects include nausea (28-39%), diarrhea, vomiting, constipation, headache, and injection site reactions. Gastrointestinal effects typically diminish over time. Rare but serious risks include pancreatitis, gallbladder disease, and acute kidney injury. Carries the thyroid C-cell tumor boxed warning.",
+    sources: [
+      { title: "SCALE Obesity Trial — Liraglutide 3.0 mg (NEJM, 2015)", url: "https://pubmed.ncbi.nlm.nih.gov/25673552/" },
+      { title: "FDA Prescribing Information — Victoza (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=victoza" },
+      { title: "Liraglutide Clinical Trials — ClinicalTrials.gov", url: "https://clinicaltrials.gov/search?term=liraglutide" },
+    ],
+  },
+  "Octreotide": {
+    sideEffects: "Common side effects include gastrointestinal effects (diarrhea, nausea, abdominal pain), injection site pain, and headache. Gallstones develop in 15-30% of patients with long-term use. May cause hyperglycemia or hypoglycemia due to effects on insulin and glucagon. Fatigue and dizziness have been reported.",
+    sources: [
+      { title: "FDA Prescribing Information — Sandostatin (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=sandostatin" },
+      { title: "Octreotide in Neuroendocrine Tumors — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=octreotide+neuroendocrine+tumor+clinical" },
+    ],
+  },
+  "Exenatide": {
+    sideEffects: "Common side effects include nausea (44%), vomiting, diarrhea, headache, and injection site reactions. Nausea is most common during initiation and generally decreases over time. Rare risks include pancreatitis and thyroid C-cell tumors (boxed warning). Anti-exenatide antibodies may develop in some patients.",
+    sources: [
+      { title: "FDA Prescribing Information — Byetta (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=byetta" },
+      { title: "Exenatide Clinical Development — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=exenatide+clinical+trial+type+2+diabetes" },
+    ],
+  },
+  "Leuprolide": {
+    sideEffects: "Common side effects include hot flashes, injection site reactions, decreased libido, erectile dysfunction, and mood changes. Long-term use may cause bone density loss. An initial testosterone flare occurs in the first 1-2 weeks of treatment in prostate cancer, which can temporarily worsen symptoms. Fatigue and weight gain are frequently reported.",
+    sources: [
+      { title: "FDA Prescribing Information — Lupron (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=lupron" },
+      { title: "Leuprolide in Prostate Cancer — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=leuprolide+prostate+cancer+clinical" },
+    ],
+  },
+  "Dulaglutide": {
+    sideEffects: "Common side effects include nausea (12-21%), diarrhea, vomiting, decreased appetite, abdominal pain, and fatigue. Injection site reactions occur infrequently. Rare risks include pancreatitis and gallbladder events. Carries the thyroid C-cell tumor boxed warning common to GLP-1 receptor agonists.",
+    sources: [
+      { title: "FDA Prescribing Information — Trulicity (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=trulicity" },
+      { title: "REWIND Cardiovascular Outcomes Trial — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=dulaglutide+REWIND+cardiovascular" },
+    ],
+  },
+  "Desmopressin": {
+    sideEffects: "Common side effects include headache, nausea, nasal congestion (intranasal route), and abdominal cramps. The most significant risk is hyponatremia (low sodium), particularly in elderly patients or those with excessive fluid intake. Water intoxication can occur if fluid intake is not restricted. Facial flushing has been reported.",
+    sources: [
+      { title: "FDA Prescribing Information — DDAVP (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=desmopressin" },
+      { title: "Desmopressin Clinical Use — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=desmopressin+clinical+safety+hyponatremia" },
+    ],
+  },
+  "Ziconotide": {
+    sideEffects: "Common side effects include dizziness, nausea, confusion, headache, somnolence, and nystagmus. Psychiatric adverse effects (depression, cognitive impairment, hallucinations) are significant concerns. Requires careful dose titration to minimize neurological side effects. Must be delivered intrathecally, which carries procedure-related risks including meningitis.",
+    sources: [
+      { title: "FDA Prescribing Information — Prialt (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=prialt" },
+      { title: "Ziconotide for Chronic Pain — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=ziconotide+intrathecal+chronic+pain" },
+    ],
+  },
+  "Carfilzomib": {
+    sideEffects: "Common side effects include fatigue, anemia, nausea, thrombocytopenia, dyspnea, diarrhea, and fever. Serious cardiovascular events (heart failure, cardiac arrest, myocardial ischemia) have been reported. Infusion reactions may occur. Hepatotoxicity and tumor lysis syndrome are additional risks. Requires regular monitoring of blood counts and cardiac function.",
+    sources: [
+      { title: "FDA Prescribing Information — Kyprolis (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=kyprolis" },
+      { title: "ASPIRE Trial — Carfilzomib in Myeloma (NEJM)", url: "https://pubmed.ncbi.nlm.nih.gov/?term=carfilzomib+ASPIRE+multiple+myeloma" },
+    ],
+  },
+  "Linaclotide": {
+    sideEffects: "Diarrhea is the most common side effect (16-20%) and the most frequent reason for discontinuation. Other reported effects include abdominal pain, flatulence, and abdominal distension. Severe diarrhea may require dose reduction or discontinuation. Contraindicated in pediatric patients under 2 years due to risk of serious dehydration.",
+    sources: [
+      { title: "FDA Prescribing Information — Linzess (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=linzess" },
+      { title: "Linaclotide in IBS-C — Clinical Trials", url: "https://pubmed.ncbi.nlm.nih.gov/?term=linaclotide+irritable+bowel+constipation+trial" },
+    ],
+  },
+  "Teriparatide": {
+    sideEffects: "Common side effects include orthostatic hypotension, leg cramps, nausea, dizziness, and injection site reactions. Transient hypercalcemia may occur after injection. Carries a boxed warning for osteosarcoma based on findings in rat studies at high doses and long durations. Treatment duration is limited to 2 years.",
+    sources: [
+      { title: "FDA Prescribing Information — Forteo (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=forteo" },
+      { title: "Teriparatide in Osteoporosis — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=teriparatide+osteoporosis+clinical+trial" },
+    ],
+  },
+  "Calcitonin-Salmon": {
+    sideEffects: "Nasal spray: rhinitis, nasal irritation, epistaxis. Injectable: nausea, facial flushing, injection site reactions. Rare allergic reactions may occur. The FDA issued a safety advisory regarding a possible association between long-term calcitonin use and increased cancer risk, leading to restricted use in some markets.",
+    sources: [
+      { title: "FDA Prescribing Information — Miacalcin (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=miacalcin" },
+      { title: "Calcitonin Safety and Cancer Risk — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=calcitonin+salmon+safety+cancer+risk" },
+    ],
+  },
+  "Setmelanotide": {
+    sideEffects: "Common side effects include injection site reactions, skin hyperpigmentation, nausea, diarrhea, and abdominal pain. Sexual adverse reactions (spontaneous penile erections, sexual adverse events) have been reported due to melanocortin receptor activation. Disturbances in skin pigmentation are expected given the mechanism of action.",
+    sources: [
+      { title: "FDA Prescribing Information — Imcivree (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=imcivree" },
+      { title: "Setmelanotide for Genetic Obesity — PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/?term=setmelanotide+POMC+deficiency+obesity" },
+    ],
+  },
+  "Abaloparatide": {
+    sideEffects: "Common side effects include injection site reactions, hypercalciuria, dizziness, nausea, headache, palpitations, fatigue, and orthostatic hypotension. Carries a boxed warning for osteosarcoma based on rat studies, similar to teriparatide. Treatment duration is limited to 2 years. Transient hypercalcemia may occur.",
+    sources: [
+      { title: "FDA Prescribing Information — Tymlos (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=tymlos" },
+      { title: "ACTIVE Trial — Abaloparatide in Osteoporosis", url: "https://pubmed.ncbi.nlm.nih.gov/?term=abaloparatide+ACTIVE+osteoporosis+trial" },
+    ],
+  },
+  "Difelikefalin": {
+    sideEffects: "Common side effects include diarrhea, dizziness, nausea, somnolence, and vomiting. Some patients experience gait disturbances. Unlike centrally-acting opioids, difelikefalin does not cause euphoria, respiratory depression, or physical dependence due to its peripheral mechanism. QTc prolongation has been reported at supratherapeutic doses.",
+    sources: [
+      { title: "FDA Prescribing Information — Korsuva (DailyMed)", url: "https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=korsuva" },
+      { title: "KALM-1 Trial — Difelikefalin for CKD Pruritus", url: "https://pubmed.ncbi.nlm.nih.gov/?term=difelikefalin+KALM+pruritus+hemodialysis" },
+    ],
   },
 };

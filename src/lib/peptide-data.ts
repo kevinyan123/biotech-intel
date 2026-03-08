@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { DB } from "./biovault-data";
-import { PEPTIDE_EDUCATION } from "./peptide-education-data";
+import { PEPTIDE_EDUCATION, PEPTIDE_SUPPLEMENTS } from "./peptide-education-data";
 
 // ── Controlled Vocabularies ──
 
@@ -85,6 +85,8 @@ export interface Peptide {
   safetyNotes: string;
   researchBackground: string;
   relatedPeptideIds: string[];
+  sideEffects: string;
+  sources: { title: string; url: string }[];
 }
 
 export interface PeptideTarget {
@@ -312,6 +314,8 @@ function parsePeptides(targets: PeptideTarget[], mfgs: PeptideManufacturer[]): P
       safetyNotes: "",
       researchBackground: "",
       relatedPeptideIds: [],
+      sideEffects: "",
+      sources: [],
     };
   });
 }
@@ -333,6 +337,11 @@ function mergeEducationalData(peptides: Peptide[]): void {
       pep.stacks = edu.stacks;
       pep.safetyNotes = edu.safetyNotes;
       pep.researchBackground = edu.researchBackground;
+    }
+    const sup = PEPTIDE_SUPPLEMENTS[pep.name];
+    if (sup) {
+      pep.sideEffects = sup.sideEffects;
+      pep.sources = sup.sources;
     }
   }
 }
