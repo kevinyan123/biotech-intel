@@ -6,7 +6,7 @@ import { DB, PH, mcTier, mcTierColor, pC } from "@/lib/biovault-data";
 import BioCard from "@/components/ui/BioCard";
 import PhaseBadge from "@/components/ui/PhaseBadge";
 import SectionHeader from "@/components/ui/SectionHeader";
-import { milestoneColor, relativeTime, daysUntil, MILESTONE_LEGEND } from "@/lib/catalyst-utils";
+import { milestoneColor, relativeTime, daysUntil, MILESTONE_LEGEND, chartMarkerCategory } from "@/lib/catalyst-utils";
 
 export default function CatalystsPage() {
   const now = new Date();
@@ -271,7 +271,17 @@ export default function CatalystsPage() {
                 className="block p-2.5 mb-2 rounded-lg transition-colors cursor-pointer"
                 style={{ background: "var(--color-b2)", border: `1px solid ${milestoneColor(ev.type)}25` }}>
                 <div className="flex justify-between items-start mb-1.5">
-                  <span className="text-[9px] font-bold rounded px-1.5 py-0.5" style={{ color: milestoneColor(ev.type), background: `${milestoneColor(ev.type)}15`, border: `1px solid ${milestoneColor(ev.type)}30` }}>{ev.type}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-bold rounded px-1.5 py-0.5" style={{ color: milestoneColor(ev.type), background: `${milestoneColor(ev.type)}15`, border: `1px solid ${milestoneColor(ev.type)}30` }}>{ev.type}</span>
+                    {chartMarkerCategory(ev.type) === "results" && ev.readoutConfidence && (
+                      <span className="text-[7px] font-mono px-1 py-px rounded" style={{
+                        color: ev.readoutConfidence === "confirmed" ? "#64b5f6" : "#ffab66",
+                        background: ev.readoutConfidence === "confirmed" ? "#64b5f615" : "#ffab6615",
+                      }}>
+                        {ev.readoutConfidence === "confirmed" ? "Confirmed" : "Est."}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[8px] font-semibold" style={{ color: mcTierColor(ev.tier) }}>{ev.tier} Cap</span>
                 </div>
                 <div className="text-[13px] font-bold mb-[3px]">{ev.drugName}</div>

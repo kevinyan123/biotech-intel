@@ -114,7 +114,8 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
         const stageDates: Record<number, { start: string; end: string; estimated?: boolean }> = {};
         Object.entries(trialsByStage).forEach(([idx, trials]) => {
           const earliest = trials.reduce((best, t) => t.startDate < best ? t.startDate : best, trials[0].startDate);
-          const latest = trials.reduce((best, t) => t.estCompletion > best ? t.estCompletion : best, trials[0].estCompletion);
+          const withCompletion = trials.filter(t => t.estCompletion);
+          const latest = withCompletion.length > 0 ? withCompletion.reduce((best, t) => t.estCompletion! > best ? t.estCompletion! : best, withCompletion[0].estCompletion!) : trials[0].startDate;
           stageDates[Number(idx)] = { start: earliest, end: latest };
         });
 
@@ -281,7 +282,7 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
                                   <div className="flex gap-1.5 text-[8px] mt-0.5" style={{ color: "var(--color-t2)" }}>
                                     <span>{t.startDate}</span>
                                     <span>→</span>
-                                    <span>{t.estCompletion}</span>
+                                    <span>{t.estCompletion || "TBD"}</span>
                                     <span>·</span>
                                     <span style={{ color: t.status === "Recruiting" || t.status === "Active" ? "#00e676" : t.status === "Completed" ? "#64b5f6" : t.status === "Terminated" ? "#ff6b6b" : "var(--color-t2)" }}>{t.status}</span>
                                   </div>
@@ -421,7 +422,7 @@ export default function DrugDetailPage({ params }: { params: Promise<{ id: strin
             {/* Trial rows with milestone markers */}
             {bySorted.map((t, i) => {
               const startPct = Math.max(0, Math.min(100, pct(t.startDate)));
-              const endPct = Math.max(0, Math.min(100, pct(t.estCompletion)));
+              const endPct = t.estCompletion ? Math.max(0, Math.min(100, pct(t.estCompletion))) : startPct + 2;
               const clr = statusColor[t.status] || "var(--color-t2)";
               const isTerminated = t.status === "Terminated" || t.status === "Withdrawn";
               return (

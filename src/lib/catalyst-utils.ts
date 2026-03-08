@@ -89,3 +89,21 @@ export const CHART_MARKER_LEGEND = [
   { label: "Enrollment", color: "#00e676", key: "enrollment" },
   { label: "Other", color: "#ffab66", key: "other" },
 ] as const;
+
+/** Returns color for readout confidence level */
+export function readoutConfidenceColor(confidence: "confirmed" | "estimated" | "unknown"): string {
+  switch (confidence) {
+    case "confirmed": return "#64b5f6";   // blue
+    case "estimated": return "#ffab66";   // orange
+    case "unknown":   return "#ff6b6b";   // red
+  }
+}
+
+/** Returns label for readout confidence level */
+export function readoutConfidenceLabel(confidence: "confirmed" | "estimated" | "unknown"): string {
+  switch (confidence) {
+    case "confirmed": return "Confirmed";
+    case "estimated": return "Estimated";
+    case "unknown":   return "Unknown";
+  }
+}

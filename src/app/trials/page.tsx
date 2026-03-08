@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DB, PH, STS, mcTier, mcTierColor } from "@/lib/biovault-data";
+import { readoutConfidenceColor } from "@/lib/catalyst-utils";
 
 const coMap = new Map(DB.companies.map((c) => [c.id, c]));
 import PhaseBadge from "@/components/ui/PhaseBadge";
@@ -75,8 +76,8 @@ export default function TrialsPage() {
                   <Link href={`/diseases/${encodeURIComponent(r.indication)}`} onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color: "var(--color-a2)" }}>{r.indication}</Link>
                 </td>
                 <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}><StatusDot status={r.status} /></td>
-                <td className="font-mono text-[8px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: r.readoutEstimated ? "#ffab66" : "#64b5f6" }}>
-                  {r.readoutDate}{r.readoutEstimated ? " ᴱ" : ""}
+                <td className="font-mono text-[8px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: readoutConfidenceColor(r.readoutConfidence) }}>
+                  {r.readoutDate || "Unknown"}{r.readoutConfidence === "estimated" ? " ᴱ" : ""}{r.readoutConfidence === "unknown" ? " ?" : ""}
                 </td>
                 <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t1)" }}>{r.enrollment}</td>
                 <td className="text-[8px]" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t2)" }}>{(r.registry || "CT.gov").replace("ClinicalTrials.gov", "CT.gov")}</td>

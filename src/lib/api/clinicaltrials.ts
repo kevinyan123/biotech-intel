@@ -12,6 +12,8 @@ export interface CTStudy {
       overallStatus: string;
       startDateStruct?: { date: string };
       completionDateStruct?: { date: string };
+      primaryCompletionDateStruct?: { date: string; type?: string };
+      resultsFirstPostedDateStruct?: { date: string };
     };
     designModule?: {
       phases?: string[];
@@ -38,6 +40,7 @@ export interface CTStudy {
     };
   };
   hasResults?: boolean;
+  resultsSection?: Record<string, unknown>;
 }
 
 export async function searchTrials(
@@ -70,17 +73,46 @@ export async function getTrialByNCT(nctId: string): Promise<CTStudy | null> {
 
 export function mapCTStudy(study: CTStudy) {
   const p = study.protocolSection;
+  const s = p.statusModule;
+
+  // ── Readout date extraction with tier priority ──
+  // Tier 1: resultsFirstPostedDate (actual results posted to ClinicalTrials.gov)
+  // Tier 3: primaryCompletionDate (estimated date primary outcome data available)
+  // If neither → unknown
+  let readoutDate: string | null = null;
+  let readoutConfidence: "confirmed" | "estimated" | "unknown" = "unknown";
+  let readoutSource: string | null = null;
+  let readoutSourceTier: 1 | 2 | 3 | null = null;
+
+  if (s.resultsFirstPostedDateStruct?.date) {
+    readoutDate = s.resultsFirstPostedDateStruct.date;
+    readoutConfidence = "confirmed";
+    readoutSource = "ClinicalTrials.gov Results";
+    readoutSourceTier = 1;
+  } else if (study.hasResults) {
+    // Has results flag but no posted date — still confirmed from CT.gov
+    readoutDate = s.completionDateStruct?.date || null;
+    readoutConfidence = readoutDate ? "confirmed" : "unknown";
+    readoutSource = readoutDate ? "ClinicalTrials.gov" : null;
+    readoutSourceTier = readoutDate ? 1 : null;
+  } else if (s.primaryCompletionDateStruct?.date) {
+    readoutDate = s.primaryCompletionDateStruct.date;
+    readoutConfidence = "estimated";
+    readoutSource = "Primary Completion Date";
+    readoutSourceTier = 3;
+  }
+
   return {
     nctId: p.identificationModule.nctId,
     title: p.identificationModule.briefTitle,
     phase: p.designModule?.phases?.join(", ") || "N/A",
-    status: p.statusModule.overallStatus,
+    status: s.overallStatus,
     conditions: p.conditionsModule?.conditions || [],
     interventions:
       p.armsInterventionsModule?.interventions?.map((i) => i.name) || [],
     sponsor: p.sponsorCollaboratorsModule?.leadSponsor?.name || "N/A",
-    startDate: p.statusModule.startDateStruct?.date || "N/A",
-    completionDate: p.statusModule.completionDateStruct?.date || null,
+    startDate: s.startDateStruct?.date || "N/A",
+    completionDate: s.completionDateStruct?.date || null,
     enrollment: p.designModule?.enrollmentInfo?.count || null,
     studyType: p.designModule?.studyType || "N/A",
     briefSummary: p.descriptionModule?.briefSummary || null,
@@ -89,5 +121,10 @@ export function mapCTStudy(study: CTStudy) {
       p.contactsLocationsModule?.locations?.map(
         (l) => `${l.city}, ${l.country}`
       ) || [],
+    // Readout date info with source tracking
+    readoutDate,
+    readoutConfidence,
+    readoutSource,
+    readoutSourceTier,
   };
 }

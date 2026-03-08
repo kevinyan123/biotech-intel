@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { chartMarkerCategory, relativeTime } from "@/lib/catalyst-utils";
 
-interface Catalyst { id: string; date: string; type: string; drugId: string; drugName: string | null; companyId: string; companyName: string; indication: string; }
+interface Catalyst { id: string; date: string; type: string; drugId: string; drugName: string | null; companyId: string; companyName: string; indication: string; readoutConfidence?: "confirmed" | "estimated"; readoutSource?: string | null; }
 
 interface Props {
   companyId: string;
@@ -207,20 +207,31 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
         {price != null && (
           <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>${price.toFixed(2)}</div>
         )}
-        {dayCats.map((c, i) => (
-          <div key={i} className="mt-1.5 pt-1.5" style={{ borderTop: "1px solid var(--color-bd)" }}>
-            <div className="flex items-center gap-1.5">
-              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: DATA_READOUT_COLOR }} />
-              <span className="text-[9px] font-bold" style={{ color: DATA_READOUT_COLOR }}>{c.type}</span>
-              <span className="text-[7px] font-mono px-1 rounded" style={{ background: `${DATA_READOUT_COLOR}15`, color: DATA_READOUT_COLOR }}>Data Readout</span>
+        {dayCats.map((c, i) => {
+          const catData = catalysts.find(cat => cat.id === c.id);
+          const confColor = catData?.readoutConfidence === "confirmed" ? "#64b5f6" : "#ffab66";
+          return (
+            <div key={i} className="mt-1.5 pt-1.5" style={{ borderTop: "1px solid var(--color-bd)" }}>
+              <div className="flex items-center gap-1.5">
+                <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: DATA_READOUT_COLOR }} />
+                <span className="text-[9px] font-bold" style={{ color: DATA_READOUT_COLOR }}>{c.type}</span>
+                <span className="text-[7px] font-mono px-1 rounded" style={{ background: `${confColor}15`, color: confColor }}>
+                  {catData?.readoutConfidence === "confirmed" ? "Confirmed" : "Estimated"}
+                </span>
+              </div>
+              <div className="text-[9px] font-semibold mt-0.5" style={{ color: "var(--color-t0)" }}>{c.drugName}</div>
+              <div className="text-[8px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
+              <div className="text-[8px] font-mono" style={{ color: DATA_READOUT_COLOR }}>
+                {fmtFull(c.ts)} · ${c.price.toFixed(2)} · {relativeTime(c.date)}
+              </div>
+              {catData?.readoutSource && (
+                <div className="text-[7px] font-mono mt-0.5" style={{ color: "var(--color-t2)" }}>
+                  Source: {catData.readoutSource}
+                </div>
+              )}
             </div>
-            <div className="text-[9px] font-semibold mt-0.5" style={{ color: "var(--color-t0)" }}>{c.drugName}</div>
-            <div className="text-[8px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
-            <div className="text-[8px] font-mono" style={{ color: DATA_READOUT_COLOR }}>
-              {fmtFull(c.ts)} · ${c.price.toFixed(2)} · {relativeTime(c.date)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };

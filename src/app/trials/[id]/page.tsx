@@ -3,7 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { DB, mcTier, mcTierColor } from "@/lib/biovault-data";
-import { relativeTime, daysUntil } from "@/lib/catalyst-utils";
+import { relativeTime, daysUntil, readoutConfidenceColor, readoutConfidenceLabel } from "@/lib/catalyst-utils";
 
 const coMap = new Map(DB.companies.map((c) => [c.id, c]));
 import BioCard from "@/components/ui/BioCard";
@@ -16,13 +16,14 @@ export default function TrialDetailPage({ params }: { params: Promise<{ id: stri
   if (!t) return <div className="p-10 text-center" style={{ color: "var(--color-t2)" }}>Trial not found</div>;
 
   // Progress calculation
+  const hasCompletion = !!t.estCompletion;
   const startMs = new Date(t.startDate).getTime();
-  const endMs = new Date(t.estCompletion).getTime();
+  const endMs = hasCompletion ? new Date(t.estCompletion!).getTime() : 0;
   const nowMs = new Date().getTime();
-  const totalDuration = Math.max(1, endMs - startMs);
+  const totalDuration = hasCompletion ? Math.max(1, endMs - startMs) : 1;
   const elapsed = nowMs - startMs;
-  const progressPct = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
-  const daysRemaining = daysUntil(t.estCompletion);
+  const progressPct = hasCompletion ? Math.max(0, Math.min(100, (elapsed / totalDuration) * 100)) : 0;
+  const daysRemaining = hasCompletion ? daysUntil(t.estCompletion!) : null;
   const isCompleted = t.status === "Completed";
   const isTerminated = t.status === "Terminated" || t.status === "Withdrawn";
 
@@ -70,8 +71,14 @@ export default function TrialDetailPage({ params }: { params: Promise<{ id: stri
           { l: "Enrollment", v: t.enrollment.toLocaleString() },
           { l: "Endpoint", v: t.endpoint },
           { l: "Start", v: t.startDate, rel: relativeTime(t.startDate), relColor: "var(--color-a2)" },
-          { l: "Completion", v: t.estCompletion, rel: relativeTime(t.estCompletion), relColor: daysRemaining > 0 ? "var(--color-ac)" : "#64b5f6" },
-          { l: "Data Readout", v: t.readoutDate, rel: t.readoutEstimated ? "Estimated" : relativeTime(t.readoutDate), relColor: t.readoutEstimated ? "#ffab66" : "#64b5f6" },
+          { l: "Completion", v: t.estCompletion || "TBD",
+            rel: t.estCompletion ? relativeTime(t.estCompletion) : "Not determined",
+            relColor: !t.estCompletion ? "#ff6b6b" : (daysRemaining && daysRemaining > 0) ? "var(--color-ac)" : "#64b5f6" },
+          { l: "Data Readout", v: t.readoutDate || "Unknown",
+            rel: t.readoutConfidence === "confirmed" && t.readoutDate ? relativeTime(t.readoutDate)
+               : t.readoutConfidence === "estimated" ? "Estimated"
+               : "No reliable source",
+            relColor: readoutConfidenceColor(t.readoutConfidence) },
         ].map((s, i) => (
           <BioCard key={i}>
             <div className="text-[8px] font-semibold uppercase tracking-wide mb-0.5 font-mono" style={{ color: "var(--color-t2)" }}>{s.l}</div>
@@ -83,14 +90,31 @@ export default function TrialDetailPage({ params }: { params: Promise<{ id: stri
         ))}
       </div>
 
+      {/* Source Provenance */}
+      {t.readoutSource && (
+        <div className="text-[9px] font-mono mb-3 -mt-2" style={{ color: "var(--color-t2)" }}>
+          Readout Source: <span style={{ color: readoutConfidenceColor(t.readoutConfidence) }}>{t.readoutSource}</span>
+          {t.readoutSourceTier && (
+            <span className="ml-1.5 px-1 py-px rounded text-[7px]"
+              style={{
+                background: `${readoutConfidenceColor(t.readoutConfidence)}15`,
+                color: readoutConfidenceColor(t.readoutConfidence),
+                border: `1px solid ${readoutConfidenceColor(t.readoutConfidence)}30`,
+              }}>
+              Tier {t.readoutSourceTier}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Progress Bar */}
       <BioCard className="mb-0">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[8px] font-semibold uppercase tracking-wide font-mono" style={{ color: "var(--color-t2)" }}>Trial Progress</span>
           <span className="text-[10px] font-mono font-semibold" style={{
-            color: isCompleted ? "#64b5f6" : isTerminated ? "#ff6b6b" : "var(--color-ac)",
+            color: isCompleted ? "#64b5f6" : isTerminated ? "#ff6b6b" : !hasCompletion ? "#ff6b6b" : "var(--color-ac)",
           }}>
-            {isCompleted ? "Completed" : isTerminated ? t.status : daysRemaining > 0 ? `${daysRemaining}d remaining` : `${Math.abs(daysRemaining)}d past est. completion`}
+            {isCompleted ? "Completed" : isTerminated ? t.status : !hasCompletion ? "Completion TBD" : daysRemaining! > 0 ? `${daysRemaining}d remaining` : `${Math.abs(daysRemaining!)}d past est. completion`}
           </span>
         </div>
         <div className="relative h-[10px] rounded-full overflow-hidden" style={{ background: "var(--color-b3)" }}>
@@ -113,7 +137,7 @@ export default function TrialDetailPage({ params }: { params: Promise<{ id: stri
         <div className="flex justify-between mt-1 text-[8px] font-mono" style={{ color: "var(--color-t2)" }}>
           <span>{t.startDate}</span>
           <span className="font-semibold" style={{ color: "var(--color-ac)", opacity: 0.6 }}>{Math.round(progressPct)}%</span>
-          <span>{t.estCompletion}</span>
+          <span>{t.estCompletion || "TBD"}</span>
         </div>
       </BioCard>
     </div>

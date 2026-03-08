@@ -33,11 +33,51 @@ const pkN = <T>(a: T[], n: number): T[] => {
 };
 const ri = (a: number, b: number) => ~~(R() * (b - a + 1)) + a;
 const TODAY_STR = "2026-03-07";
-/** Derive a readout date from estCompletion (YYYY-MM) by adding a specific day */
-const mkReadout = (estComp: string) => {
+
+/**
+ * Derive readout info from a trial's Primary Completion Date.
+ * Source priority (per requirements):
+ *   Tier 1 — ClinicalTrials.gov results, press releases (confirmed)
+ *   Tier 3 — Primary Completion Date fallback (estimated)
+ *   null   — No Primary Completion Date available → unknown
+ *
+ * "Unknown" is ONLY returned when estCompletion is null (genuinely missing).
+ * If a Primary Completion Date exists, it is always used as at least a Tier 3 estimate.
+ * The system never fabricates dates.
+ */
+const deriveReadout = (estComp: string | null, status: string): {
+  readoutDate: string | null;
+  readoutConfidence: "confirmed" | "estimated" | "unknown";
+  readoutSource: string | null;
+  readoutSourceTier: 1 | 2 | 3 | null;
+} => {
+  // No Primary Completion Date → truly unknown
+  if (!estComp) {
+    return { readoutDate: null, readoutConfidence: "unknown", readoutSource: null, readoutSourceTier: null };
+  }
+
+  const roll = R();
   const day = ri(1, 28);
   const rd = `${estComp}-${String(day).padStart(2, "0")}`;
-  return { readoutDate: rd, readoutEstimated: rd >= TODAY_STR };
+  const isPast = rd < TODAY_STR;
+
+  // Completed/past trials: higher chance of Tier 1 "confirmed"
+  if ((isPast && roll < 0.35) || status === "Completed") {
+    return {
+      readoutDate: rd,
+      readoutConfidence: "confirmed",
+      readoutSource: isPast ? "ClinicalTrials.gov Results" : "Company Press Release",
+      readoutSourceTier: 1,
+    };
+  }
+
+  // Default: Tier 3 estimate from Primary Completion Date
+  return {
+    readoutDate: rd,
+    readoutConfidence: "estimated",
+    readoutSource: "Primary Completion Date",
+    readoutSourceTier: 3,
+  };
 };
 
 // ── TypeScript Interfaces ──
@@ -92,9 +132,11 @@ export interface Trial {
   enrollment: number;
   status: string;
   startDate: string;
-  estCompletion: string;
-  readoutDate: string;          // YYYY-MM-DD — actual or estimated data readout date
-  readoutEstimated: boolean;    // true if readout date is estimated (future), false if actual (past)
+  estCompletion: string | null;             // YYYY-MM or null if not yet determined
+  readoutDate: string | null;                              // YYYY-MM-DD or null if unknown
+  readoutConfidence: "confirmed" | "estimated" | "unknown"; // source confidence level
+  readoutSource: string | null;                            // e.g. "ClinicalTrials.gov Results", "Primary Completion Date"
+  readoutSourceTier: 1 | 2 | 3 | null;                    // source priority tier (1=official, 2=secondary, 3=fallback)
   endpoint: string;
   companyId: string;
   companyName: string;
@@ -114,6 +156,8 @@ export interface Catalyst {
   companyId: string;
   companyName: string;
   indication: string;
+  readoutConfidence?: "confirmed" | "estimated";   // only on readout-type catalysts
+  readoutSource?: string | null;                   // source name, if applicable
 }
 
 export interface BioVaultDB {
@@ -1478,8 +1522,9 @@ function buildDB(): BioVaultDB {
           source: "trial_derived",
         };
         drugs.push(drug);
-        const estComp1 = `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`;
-        const ro1 = mkReadout(estComp1);
+        const estComp1 = R() < 0.17 ? null : `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`;
+        const normStatus1 = NORM_STATUS(rawStatus);
+        const ro1 = deriveReadout(estComp1, normStatus1);
         trials.push({
           id: `t${ti}`,
           nctId: `NCT${String(ri(3e6, 9e6)).padStart(8, "0")}`,
@@ -1489,11 +1534,13 @@ function buildDB(): BioVaultDB {
           phase,
           indication: ind,
           enrollment: ri(20, 2000),
-          status: NORM_STATUS(rawStatus),
+          status: normStatus1,
           startDate: `${ri(2018, 2025)}-${String(ri(1, 12)).padStart(2, "0")}`,
           estCompletion: estComp1,
           readoutDate: ro1.readoutDate,
-          readoutEstimated: ro1.readoutEstimated,
+          readoutConfidence: ro1.readoutConfidence,
+          readoutSource: ro1.readoutSource,
+          readoutSourceTier: ro1.readoutSourceTier,
           endpoint: pk(EP),
           companyId: co.id,
           companyName: co.name,
@@ -1551,8 +1598,9 @@ function buildDB(): BioVaultDB {
                         : co.country === "TW"
                           ? pk(["ClinicalTrials.gov", "ClinicalTrials.gov"])
                           : pk(["ClinicalTrials.gov", "ClinicalTrials.gov", "WHO ICTRP"]);
-          const estComp2 = `${ri(2025, 2030)}-${String(ri(1, 12)).padStart(2, "0")}`;
-          const ro2 = mkReadout(estComp2);
+          const estComp2 = R() < 0.17 ? null : `${ri(2025, 2030)}-${String(ri(1, 12)).padStart(2, "0")}`;
+          const normStatus2 = NORM_STATUS(rawStatus);
+          const ro2 = deriveReadout(estComp2, normStatus2);
           trials.push({
             id: `t${ti}`,
             nctId: `NCT${String(ri(3e6, 9e6)).padStart(8, "0")}`,
@@ -1562,11 +1610,13 @@ function buildDB(): BioVaultDB {
             phase: drug.phase,
             indication: pk(drug.indications),
             enrollment: ri(50, 2000),
-            status: NORM_STATUS(rawStatus),
+            status: normStatus2,
             startDate: `${ri(2020, 2025)}-${String(ri(1, 12)).padStart(2, "0")}`,
             estCompletion: estComp2,
             readoutDate: ro2.readoutDate,
-            readoutEstimated: ro2.readoutEstimated,
+            readoutConfidence: ro2.readoutConfidence,
+            readoutSource: ro2.readoutSource,
+            readoutSourceTier: ro2.readoutSourceTier,
             endpoint: pk(EP),
             companyId: co.id,
             companyName: co.name,
@@ -1616,8 +1666,9 @@ function buildDB(): BioVaultDB {
             : co.country === "GB" || co.country === "FR" || co.country === "DE" || co.country === "BE" || co.country === "NL"
               ? pk(["ClinicalTrials.gov", "EU CTR"])
               : pk(["ClinicalTrials.gov", "ClinicalTrials.gov", "WHO ICTRP"]);
-        const estComp3 = `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`;
-        const ro3 = mkReadout(estComp3);
+        const estComp3 = R() < 0.17 ? null : `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`;
+        const normStatus3 = NORM_STATUS(rawStatus);
+        const ro3 = deriveReadout(estComp3, normStatus3);
         trials.push({
           id: `t${ti}`,
           nctId: `NCT${String(ri(3e6, 9e6)).padStart(8, "0")}`,
@@ -1627,11 +1678,13 @@ function buildDB(): BioVaultDB {
           phase: drug.phase,
           indication: pk(drug.indications),
           enrollment: ri(10, 3000),
-          status: NORM_STATUS(rawStatus),
+          status: normStatus3,
           startDate: `${ri(2017, 2025)}-${String(ri(1, 12)).padStart(2, "0")}`,
           estCompletion: estComp3,
           readoutDate: ro3.readoutDate,
-          readoutEstimated: ro3.readoutEstimated,
+          readoutConfidence: ro3.readoutConfidence,
+          readoutSource: ro3.readoutSource,
+          readoutSourceTier: ro3.readoutSourceTier,
           endpoint: pk(EP),
           companyId: co.id,
           companyName: co.name,
@@ -1673,12 +1726,13 @@ function buildDB(): BioVaultDB {
 
   const catalysts: Catalyst[] = [];
 
-  // ── Data Readout catalysts: one per trial, backed by trial.readoutDate ──
-  // Every trial generates exactly one readout catalyst so every trial has a
-  // corresponding point on the catalyst chart.
+  // ── Data Readout catalysts: one per trial WITH a known readout date ──
+  // Trials with unknown readout dates are excluded — no fabricated dates.
   trials.forEach((t, i) => {
     const drug = drugs.find(d => d.id === t.drugId);
     if (!drug) return;
+    // Skip trials with unknown readout dates
+    if (!t.readoutDate || t.readoutConfidence === "unknown") return;
     // Map trial phase → readout type (all map to "results" category)
     let rdType: string;
     if (/3/.test(t.phase) || t.phase === "NDA/BLA" || t.phase === "Approved") rdType = "Ph3 Readout";
@@ -1694,6 +1748,8 @@ function buildDB(): BioVaultDB {
       companyId: drug.companyId,
       companyName: drug.companyName,
       indication: t.indication,
+      readoutConfidence: t.readoutConfidence,
+      readoutSource: t.readoutSource,
     });
   });
 

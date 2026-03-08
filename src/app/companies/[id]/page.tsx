@@ -8,6 +8,7 @@ import PhaseBadge from "@/components/ui/PhaseBadge";
 import Tag from "@/components/ui/Tag";
 import SectionHeader from "@/components/ui/SectionHeader";
 import StockChart from "@/components/company/StockChart";
+import InsiderTrading from "@/components/company/InsiderTrading";
 
 const fColor = (t: string) => {
   if (t.startsWith("10-K")) return "#4fc3f7";
@@ -246,6 +247,14 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </BioCard>
         </div>
+      )}
+
+      {/* Insider Trading Activity — public companies with a ticker only */}
+      {co.isPublic && co.ticker && (
+        <>
+          <SectionHeader>Insider Trading Activity</SectionHeader>
+          <InsiderTrading ticker={co.ticker} />
+        </>
       )}
 
       {/* Catalyst Events */}
