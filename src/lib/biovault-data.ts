@@ -1655,9 +1655,15 @@ function buildDB(): BioVaultDB {
   const catCount = Math.min(900, Math.max(250, ~~(drugs.length * 0.15)));
   for (let i = 0; i < catCount; i++) {
     const d = pk(drugs);
+    // Generate dates from Jul 2025 to Dec 2026 (18 months)
+    // ~44% past (Jul'25–Feb'26), ~56% future (Mar'26+)
+    const mOff = ri(0, 17);           // 0=Jul'25 … 5=Dec'25, 6=Jan'26 … 17=Dec'26
+    const baseMonth = 7 + mOff;       // 7–24
+    const catYear = baseMonth > 12 ? 2026 : 2025;
+    const catMonth = baseMonth > 12 ? baseMonth - 12 : baseMonth;
     catalysts.push({
       id: `k${i}`,
-      date: `2026-${String(ri(3, 12)).padStart(2, "0")}-${String(ri(1, 28)).padStart(2, "0")}`,
+      date: `${catYear}-${String(catMonth).padStart(2, "0")}-${String(ri(1, 28)).padStart(2, "0")}`,
       type: pk(["Ph3 Readout", "PDUFA", "Ph2 Data", "Conference", "AdCom", "NDA", "EMA Filing", "Interim", "BTD", "Fast Track", "Orphan Drug", "Ph1 Dose Esc", "Enrollment Complete"]),
       drugId: d.id,
       drugCode: d.code,
@@ -1667,10 +1673,10 @@ function buildDB(): BioVaultDB {
       indication: pk(d.indications),
     });
   }
-  // Add trial completion milestones for trials completing in 2026
+  // Add trial completion milestones for trials completing in 2025–2026
   let milestoneId = catCount;
   trials.forEach(t => {
-    if (t.estCompletion && t.estCompletion.startsWith("2026")) {
+    if (t.estCompletion && (t.estCompletion.startsWith("2026") || t.estCompletion.startsWith("2025"))) {
       const drug = drugs.find(d => d.id === t.drugId);
       if (drug) {
         catalysts.push({

@@ -147,7 +147,7 @@ export default function DashboardPage() {
             </tr>
           </thead>
           <tbody>
-            {DB.catalysts.slice(0, 25).map((c) => {
+            {DB.catalysts.filter(c => c.date >= new Date().toISOString().slice(0, 10)).slice(0, 25).map((c) => {
               const drug = DB.drugs.find((d) => d.id === c.drugId);
               const mc = milestoneColor(c.type);
               return (

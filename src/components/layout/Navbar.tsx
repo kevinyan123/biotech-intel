@@ -32,7 +32,7 @@ export default function Navbar() {
           <span className="font-serif font-[800] text-[15px] tracking-tight whitespace-nowrap">KBY Biotech Index</span>
           <span className="text-[7px] font-mono font-semibold px-[3px] rounded-sm border"
             style={{ color: "var(--color-ac)", background: "var(--color-acd)", borderColor: "rgba(0,223,162,0.15)" }}>
-            v0.0.26
+            v0.0.27
           </span>
         </Link>
 

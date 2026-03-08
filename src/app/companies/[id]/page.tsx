@@ -248,27 +248,30 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {/* Upcoming Catalysts */}
-      <SectionHeader>Upcoming Catalysts ({cat.length})</SectionHeader>
+      {/* Catalyst Events */}
+      <SectionHeader>Catalyst Events ({cat.length})</SectionHeader>
       {cat.length > 0 ? (
         <BioCard>
-          {cat.map((c, i) => (
-            <div key={i} className="flex items-center gap-2.5 py-2" style={{ borderBottom: i < cat.length - 1 ? "1px solid var(--color-bd)" : "none" }}>
-              <span className="font-mono text-[11px] font-semibold min-w-[80px]" style={{ color: "var(--color-ac)" }}>{c.date}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold">
-                  <Link href={`/drugs/${c.drugId}`} className="hover:underline" style={{ color: "var(--color-a2)" }}>{c.drugName}</Link>
-                  {" "}<span className="font-normal" style={{ color: "var(--color-t2)" }}>— {c.type}</span>
+          {cat.map((c, i) => {
+            const isPast = c.date < new Date().toISOString().slice(0, 10);
+            return (
+              <div key={i} className="flex items-center gap-2.5 py-2" style={{ borderBottom: i < cat.length - 1 ? "1px solid var(--color-bd)" : "none", opacity: isPast ? 0.55 : 1 }}>
+                <span className="font-mono text-[11px] font-semibold min-w-[80px]" style={{ color: isPast ? "var(--color-t2)" : "var(--color-ac)" }}>{c.date}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold">
+                    <Link href={`/drugs/${c.drugId}`} className="hover:underline" style={{ color: "var(--color-a2)" }}>{c.drugName}</Link>
+                    {" "}<span className="font-normal" style={{ color: "var(--color-t2)" }}>— {c.type}</span>
+                  </div>
+                  <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
                 </div>
-                <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
+                <Tag color="var(--color-a3)">{isPast ? "Past" : c.type}</Tag>
               </div>
-              <Tag color="var(--color-a3)">{c.type}</Tag>
-            </div>
-          ))}
+            );
+          })}
         </BioCard>
       ) : (
         <BioCard style={{ padding: 20, textAlign: "center" }}>
-          <div className="text-xs" style={{ color: "var(--color-t2)" }}>No upcoming catalysts scheduled.</div>
+          <div className="text-xs" style={{ color: "var(--color-t2)" }}>No catalyst events scheduled.</div>
         </BioCard>
       )}
     </div>
