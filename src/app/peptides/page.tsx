@@ -42,11 +42,8 @@ export default function PeptidesHub() {
     <div>
       {/* Header */}
       <div className="mb-4">
-        <h1 className="font-serif font-[800] text-[22px] tracking-tight" style={{ color: "var(--color-t0)" }}>
-          Peptide Intelligence
-        </h1>
-        <p className="text-[10px] mt-0.5" style={{ color: "var(--color-t2)" }}>
-          Comprehensive peptide therapeutics database — {stats.total} peptides, {stats.targets} targets, {stats.mfgs} manufacturers
+        <p className="text-[10px] mt-0.5 leading-relaxed max-w-[600px]" style={{ color: "var(--color-t2)" }}>
+          A structured knowledge base of peptide therapeutics — covering {stats.total} peptides, {stats.targets} biological targets, and {stats.mfgs} manufacturers worldwide.
         </p>
       </div>
 

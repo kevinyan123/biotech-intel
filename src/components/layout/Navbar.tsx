@@ -16,7 +16,32 @@ const navItems = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const isPeptideSection = pathname.startsWith("/peptides");
 
+  /* ── Peptide section: compact "back" bar ── */
+  if (isPeptideSection) {
+    return (
+      <header className="sticky top-0 z-50 border-b backdrop-blur-xl"
+        style={{ background: "var(--color-b0)ee", borderColor: "var(--color-bd)" }}>
+        <div className="flex items-center px-3 h-9">
+          <Link href="/" className="flex items-center gap-1.5 text-[10px] font-mono transition-colors group shrink-0"
+            style={{ color: "var(--color-t2)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60 group-hover:opacity-100 transition-opacity">
+              <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+            </svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--color-ac)" }}>
+              <path d="M2 15c6.667-6 13.333 0 20-6"/>
+              <path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993"/>
+              <path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993"/>
+            </svg>
+            <span className="group-hover:underline">Back to KBY Biotech Index</span>
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
+  /* ── Standard navbar for all other pages ── */
   return (
     <header className="sticky top-0 z-50 border-b backdrop-blur-xl"
       style={{ background: "var(--color-b1)ee", borderColor: "var(--color-bd)" }}>
@@ -33,7 +58,7 @@ export default function Navbar() {
           <span className="font-serif font-[800] text-[15px] tracking-tight whitespace-nowrap">KBY Biotech Index</span>
           <span className="text-[7px] font-mono font-semibold px-[3px] rounded-sm border"
             style={{ color: "var(--color-ac)", background: "var(--color-acd)", borderColor: "rgba(0,223,162,0.15)" }}>
-            v0.0.33
+            v0.0.34
           </span>
         </Link>
 
