@@ -20,8 +20,29 @@ interface Props {
 const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const fmtAxis = (d: string) => { const [y, m] = d.split("-"); return `${MO[parseInt(m) - 1]} '${y.slice(2)}`; };
 const fmtFull = (d: string) => { const [y, m, day] = d.split("-"); return `${MO[parseInt(m) - 1]} ${parseInt(day)}, ${y}`; };
+const toStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const todayStr = toStr(new Date());
 
-const todayStr = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; })();
+/** Find the nearest date in a sorted date array (snap to closest trading day) */
+function snapToNearest(target: string, dates: string[]): string | null {
+  if (dates.length === 0) return null;
+  if (dates.includes(target)) return target;
+  // Binary search for closest
+  let lo = 0, hi = dates.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid] < target) lo = mid + 1; else hi = mid;
+  }
+  // lo is now the first date >= target
+  if (lo === 0) return dates[0];
+  if (lo >= dates.length) return dates[dates.length - 1];
+  // Pick whichever is closer
+  const before = dates[lo - 1];
+  const after = dates[lo];
+  const tb = Math.abs(new Date(target).getTime() - new Date(before).getTime());
+  const ta = Math.abs(new Date(target).getTime() - new Date(after).getTime());
+  return tb <= ta ? before : after;
+}
 
 export default function StockChart({ companyId, ticker, marketCap, catalysts }: Props) {
   const [timeRange, setTimeRange] = useState<"6M"|"1Y"|"2Y">("1Y");
@@ -52,76 +73,151 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
           setCurrentPrice(data.currentPrice || null);
         }
       })
-      .catch(err => {
+      .catch(() => {
         setError("Failed to fetch stock data");
         setAllData([]);
       })
       .finally(() => setLoading(false));
   }, [ticker]);
 
-  const filteredData = useMemo(() => {
+  // Filter historical data by time range
+  const historicalData = useMemo(() => {
     const now = new Date();
     const cutoff = new Date(now);
     if (timeRange === "6M") cutoff.setMonth(cutoff.getMonth() - 6);
     else if (timeRange === "1Y") cutoff.setMonth(cutoff.getMonth() - 12);
     else cutoff.setMonth(cutoff.getMonth() - 24);
-    const cutStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,"0")}-${String(cutoff.getDate()).padStart(2,"0")}`;
+    const cutStr = toStr(cutoff);
     return allData.filter(d => d.date >= cutStr);
   }, [allData, timeRange]);
 
-  // Price change calculation
+  // All available trading dates (for snapping catalyst dates)
+  const tradingDates = useMemo(() => allData.map(d => d.date), [allData]);
+
+  // Last known price (for future projection)
+  const lastPrice = useMemo(() => {
+    if (allData.length === 0) return 0;
+    return allData[allData.length - 1].price;
+  }, [allData]);
+  const lastDate = useMemo(() => {
+    if (allData.length === 0) return todayStr;
+    return allData[allData.length - 1].date;
+  }, [allData]);
+
+  // Determine upcoming catalysts that need future projection dates
+  const upcomingCatalystDates = useMemo(() => {
+    if (!showUpcoming) return [];
+    return catalysts
+      .filter(c => c.date > lastDate && !hiddenCats.has(chartMarkerCategory(c.type)))
+      .map(c => c.date)
+      .sort();
+  }, [catalysts, lastDate, showUpcoming, hiddenCats]);
+
+  // Build chart data: historical + future projection for upcoming catalysts
+  const chartData = useMemo(() => {
+    if (historicalData.length === 0) return [];
+
+    // Start with historical prices
+    const data: { date: string; price: number; volume: number; projected?: boolean }[] =
+      historicalData.map(d => ({ ...d }));
+
+    // If there are upcoming catalysts, extend with daily projected points
+    if (upcomingCatalystDates.length > 0) {
+      const furthest = upcomingCatalystDates[upcomingCatalystDates.length - 1];
+      // Cap projection to 6 months from today max
+      const cap = new Date();
+      cap.setMonth(cap.getMonth() + 6);
+      const capStr = toStr(cap);
+      const endDate = furthest < capStr ? furthest : capStr;
+
+      // Generate daily points from day after last real date to endDate
+      const cursor = new Date(lastDate);
+      cursor.setDate(cursor.getDate() + 1);
+      while (toStr(cursor) <= endDate) {
+        data.push({ date: toStr(cursor), price: lastPrice, volume: 0, projected: true });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+
+    return data;
+  }, [historicalData, upcomingCatalystDates, lastDate, lastPrice]);
+
+  // Set of all dates in chartData for quick lookup
+  const chartDateSet = useMemo(() => new Set(chartData.map(d => d.date)), [chartData]);
+
+  // Price change calculation (historical only)
   const priceChange = useMemo(() => {
-    if (filteredData.length < 2) return null;
-    const first = filteredData[0].price;
-    const last = filteredData[filteredData.length - 1].price;
+    if (historicalData.length < 2) return null;
+    const first = historicalData[0].price;
+    const last = historicalData[historicalData.length - 1].price;
     const change = last - first;
     const pct = (change / first) * 100;
     return { change, pct, isUp: change >= 0 };
-  }, [filteredData]);
+  }, [historicalData]);
 
-  // Price lookup map for catalyst markers
+  // Price lookup map
   const priceMap = useMemo(() => {
     const m = new Map<string, number>();
     allData.forEach(d => m.set(d.date, d.price));
     return m;
   }, [allData]);
 
+  // Process catalysts: snap past dates to nearest trading day, future dates to projected points
   const visibleCatalysts = useMemo(() => {
-    return catalysts.filter(c => {
-      if (!showUpcoming && c.date >= todayStr) return false;
-      if (!showPast && c.date < todayStr) return false;
-      const cat = chartMarkerCategory(c.type);
-      if (hiddenCats.has(cat)) return false;
-      // Only show past catalysts within chart range (they have price data)
-      if (filteredData.length === 0) return false;
-      if (c.date < filteredData[0].date) return false;
-      // For past catalysts, must be within data range
-      if (c.date < todayStr && c.date > filteredData[filteredData.length - 1].date) return false;
-      return true;
-    });
-  }, [catalysts, showUpcoming, showPast, hiddenCats, filteredData]);
+    return catalysts
+      .filter(c => {
+        const isFuture = c.date >= todayStr;
+        if (!showUpcoming && isFuture) return false;
+        if (!showPast && !isFuture) return false;
+        if (hiddenCats.has(chartMarkerCategory(c.type))) return false;
+        return true;
+      })
+      .map(c => {
+        const isFuture = c.date >= todayStr;
+        let snappedDate: string | null = null;
+        let displayPrice: number | null = null;
 
-  // Find closest price for a catalyst date
-  const catPrice = (date: string): number | null => {
-    if (priceMap.has(date)) return priceMap.get(date)!;
-    // Find nearest trading day
-    const sorted = [...priceMap.keys()].sort();
-    for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i] >= date) return priceMap.get(sorted[i])!;
-    }
-    return priceMap.get(sorted[sorted.length - 1]) ?? null;
-  };
+        if (isFuture) {
+          // For future catalysts, use the projected date if it's in chartData
+          if (chartDateSet.has(c.date)) {
+            snappedDate = c.date;
+            displayPrice = lastPrice;
+          }
+        } else {
+          // For past catalysts, snap to nearest trading day in the chart range
+          snappedDate = snapToNearest(c.date, tradingDates);
+          if (snappedDate) {
+            displayPrice = priceMap.get(snappedDate) ?? null;
+            // Must be within the filtered range
+            if (chartData.length > 0 && (snappedDate < chartData[0].date || snappedDate > chartData[chartData.length - 1].date)) {
+              snappedDate = null;
+            }
+          }
+        }
+
+        if (!snappedDate || displayPrice === null) return null;
+        return { ...c, snappedDate, displayPrice, isFuture };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+  }, [catalysts, showUpcoming, showPast, hiddenCats, chartDateSet, tradingDates, priceMap, chartData, lastPrice]);
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     const price = payload[0].value;
     const date = label;
-    const dayCats = catalysts.filter(c => c.date === date);
+    const isProjected = chartData.find(d => d.date === date)?.projected;
+    // Match catalysts by both original date and snapped date
+    const dayCats = visibleCatalysts.filter(c => c.snappedDate === date || c.date === date);
     return (
       <div style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, maxWidth: 240 }}>
-        <div className="font-mono text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>{fmtFull(date)}</div>
-        <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>${price.toFixed(2)}</div>
+        <div className="font-mono text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>
+          {fmtFull(date)}
+          {isProjected && <span className="ml-1 opacity-50">(projected)</span>}
+        </div>
+        <div className="font-mono font-bold text-[14px]" style={{ color: isProjected ? "var(--color-t2)" : "var(--color-ac)" }}>
+          ${price.toFixed(2)}
+        </div>
         {dayCats.map((c, i) => (
           <div key={i} className="mt-1.5 pt-1.5" style={{ borderTop: "1px solid var(--color-bd)" }}>
             <div className="flex items-center gap-1.5">
@@ -151,7 +247,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
   }
 
   // Error state
-  if (error || filteredData.length === 0) {
+  if (error || chartData.length === 0) {
     return (
       <div style={{ height: 200 }} className="flex items-center justify-center">
         <div className="text-center">
@@ -167,7 +263,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
   }
 
   // Compute Y domain with some padding
-  const prices = filteredData.map(d => d.price);
+  const prices = chartData.map(d => d.price);
   const minP = Math.min(...prices);
   const maxP = Math.max(...prices);
   const pad = (maxP - minP) * 0.1 || 1;
@@ -182,6 +278,9 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
 
   // Determine line color based on price change
   const lineColor = priceChange && priceChange.isUp ? "#00f5b0" : "#ff6b6b";
+
+  // Check if we have future projection
+  const hasProjection = chartData.some(d => (d as any).projected);
 
   return (
     <div>
@@ -242,7 +341,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
       {/* Chart */}
       <div style={{ width: "100%", height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={filteredData} margin={{ top: 10, right: 8, left: -10, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 10, right: 8, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id={`sg-${companyId}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
@@ -254,7 +353,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
               dataKey="date" tickFormatter={fmtAxis}
               stroke="#7e92a6" fontSize={8} fontFamily="JetBrains Mono, monospace"
               tickLine={false} axisLine={{ stroke: "#2a3a4e" }}
-              interval={Math.max(1, Math.floor(filteredData.length / 8))}
+              interval={Math.max(1, Math.floor(chartData.length / 8))}
             />
             <YAxis
               tickFormatter={(v: number) => `$${v.toFixed(0)}`}
@@ -265,6 +364,15 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#7e92a644", strokeDasharray: "3 3" }} />
 
+            {/* Today marker — only show if chart extends into future */}
+            {hasProjection && (
+              <ReferenceLine
+                x={lastDate} stroke="#7e92a6" strokeDasharray="4 4" strokeWidth={1}
+                label={{ value: "Today", position: "insideTopRight", fill: "#7e92a6", fontSize: 8, fontFamily: "JetBrains Mono" }}
+              />
+            )}
+
+            {/* Price line */}
             <Area
               type="monotone" dataKey="price"
               stroke={lineColor} strokeWidth={1.5}
@@ -274,19 +382,16 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
 
             {/* Catalyst markers */}
             {visibleCatalysts.map((c, i) => {
-              const p = catPrice(c.date);
-              if (p === null) return null;
               const mc = chartMarkerColor(c.type);
-              const isFuture = c.date >= todayStr;
               return (
                 <ReferenceDot
                   key={`cat-${i}`}
-                  x={c.date} y={p}
+                  x={c.snappedDate} y={c.displayPrice}
                   r={5}
-                  fill={isFuture ? "transparent" : mc}
+                  fill={c.isFuture ? "transparent" : mc}
                   stroke={mc}
-                  strokeWidth={isFuture ? 2 : 1.5}
-                  strokeDasharray={isFuture ? "2 2" : undefined}
+                  strokeWidth={c.isFuture ? 2 : 1.5}
+                  strokeDasharray={c.isFuture ? "2 2" : undefined}
                 />
               );
             })}
@@ -294,7 +399,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
         </ResponsiveContainer>
       </div>
 
-      {/* Legend + Price info */}
+      {/* Legend + info */}
       <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
         <div className="flex gap-2.5 text-[8px] flex-wrap items-center" style={{ color: "var(--color-t2)" }}>
           {CHART_MARKER_LEGEND.map((item, i) => (
