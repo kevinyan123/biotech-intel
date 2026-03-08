@@ -14,7 +14,7 @@ export default function PeptideHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 border-b backdrop-blur-xl -mx-3 px-3"
+    <header className="sticky top-0 z-50 border-b backdrop-blur-xl -mx-3 -mt-3 px-3"
       style={{ background: "var(--color-b1)ee", borderColor: "var(--color-bd)" }}>
       <div className="flex items-center gap-3 h-11 overflow-x-auto scrollbar-hide"
         style={{ WebkitOverflowScrolling: "touch" }}>
