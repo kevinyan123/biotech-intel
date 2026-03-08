@@ -15,6 +15,7 @@ export const PEPTIDE_CLASSES = [
   "PTH Analog", "Insulin Analog", "GnRH Analog", "Proteasome Inhibitor",
   "Guanylate Cyclase Agonist", "BPI Mimetic", "Amylin Analog", "Endothelin Antagonist",
   "Growth Hormone Secretagogue", "Growth Hormone Releasing Peptide",
+  "Antithrombotic Peptide", "Antiviral Peptide",
 ] as const;
 
 export const PEPTIDE_CLASSIFICATIONS = ["Therapeutic", "Diagnostic", "Research"] as const;
@@ -145,7 +146,11 @@ ETR-A|Endothelin Receptor Type A|GPCR|Vasoconstriction|null|Mediates endothelin-
 N-type Ca|N-Type Calcium Channel|Ion Channel|Pain Signaling|null|Voltage-gated calcium channel in dorsal horn nociception
 GHRH-R|Growth Hormone Releasing Hormone Receptor|GPCR|GHRH|null|Mediates growth hormone release from anterior pituitary somatotrophs
 GHS-R|Growth Hormone Secretagogue Receptor|GPCR|Ghrelin|null|Receptor for ghrelin and synthetic growth hormone secretagogues
-KISS1R|Kisspeptin Receptor|GPCR|HPG Axis|null|Key regulator of GnRH neuron activity and pubertal development`;
+KISS1R|Kisspeptin Receptor|GPCR|HPG Axis|null|Key regulator of GnRH neuron activity and pubertal development
+Thrombin|Thrombin (Factor IIa)|Enzyme|Coagulation|null|Serine protease central to the coagulation cascade converting fibrinogen to fibrin
+gp41|HIV-1 Envelope Glycoprotein 41|Receptor Tyrosine Kinase|Viral Entry|null|HIV-1 transmembrane protein mediating virus-host cell membrane fusion
+AT1R|Angiotensin II Type 1 Receptor|GPCR|RAAS|null|Primary mediator of angiotensin II cardiovascular effects on blood pressure and aldosterone
+VPAC1|Vasoactive Intestinal Peptide Receptor 1|GPCR|VIP Signaling|null|Receptor for VIP mediating vasodilation and smooth muscle relaxation`;
 
 // ── Seed Data: Manufacturers ──
 // Format: name|hq|country|type|founded|website|specialties (;-separated)|capabilities (;-separated)
@@ -223,7 +228,27 @@ Epitalon|Epithalon;Epithalone|Research|Neuropeptide|99|5|4|390|SC Injection|2h|M
 LL-37|Cathelicidin|Research|Antimicrobial Peptide|99|5|37|4493|Topical;SC Injection|1h|Low|none|Antimicrobial;Wound Healing;Immune Modulation|Research|null|Human cathelicidin antimicrobial peptide with broad-spectrum antimicrobial and immunomodulatory properties
 Selank|TP-7|Therapeutic|Neuropeptide|99|6|7|751|Intranasal|1h|Moderate|none|Anxiety;Cognitive Enhancement|Approved|2009|Synthetic analog of tuftsin with anxiolytic and nootropic properties
 Semax|ACTH 4-10 Analog|Therapeutic|Neuropeptide|99|6|7|813|Intranasal|1h|Moderate|none|Cognitive Enhancement;Neuroprotection|Approved|2011|Synthetic analog of ACTH fragment 4-10 with neuroprotective and cognitive-enhancing properties
-Gonadorelin|Factrel;Lutrepulse|Therapeutic|GnRH Analog|5|10|10|1182|SC Injection;IV Infusion|0.2h|Low|none|Hypogonadism;Fertility Testing|Approved|1982|Synthetic gonadotropin-releasing hormone for diagnostic and therapeutic use`;
+Gonadorelin|Factrel;Lutrepulse|Therapeutic|GnRH Analog|5|10|10|1182|SC Injection;IV Infusion|0.2h|Low|none|Hypogonadism;Fertility Testing|Approved|1982|Synthetic gonadotropin-releasing hormone for diagnostic and therapeutic use
+Oxytocin|Pitocin;Syntocinon|Therapeutic|Oxytocin Analog|11|10|9|1007|IV Infusion;Intramuscular;Intranasal|3min|Low|Cyclization;Disulfide Bridge|Labor Induction;Postpartum Hemorrhage;Lactation|Approved|1980|Endogenous neuropeptide hormone regulating uterine contraction labor and social bonding
+Vasopressin|Vasostrict;ADH;Antidiuretic Hormone|Therapeutic|Vasopressin Analog|10|10|9|1084|IV Infusion|10min|Low|Cyclization;Disulfide Bridge|Vasodilatory Shock;Diabetes Insipidus;Cardiac Arrest|Approved|2014|Endogenous posterior pituitary hormone regulating water retention and vascular tone
+Glucagon|GlucaGen;Baqsimi;Gvoke|Therapeutic|Neuropeptide|99|11|29|3483|SC Injection;Intramuscular;Intranasal|8min|Low|none|Severe Hypoglycemia;Diagnostic Aid|Approved|1998|Pancreatic alpha-cell hormone that raises blood glucose by promoting hepatic glycogenolysis
+Plecanatide|Trulance|Therapeutic|Guanylate Cyclase Agonist|8|4|16|1682|Oral|1h|Moderate|Cyclization;Disulfide Bridge|IBS-C;CIC|Approved|2017|Uroguanylin analog that activates GC-C to increase intestinal fluid secretion and transit
+Lixisenatide|Adlyxin;Lyxumia|Therapeutic|GLP-1 Agonist|0|8|44|4858|SC Injection|3h|Moderate|none|T2D|Approved|2016|Once-daily GLP-1 receptor agonist derived from exendin-4 with modified C-terminus
+Bivalirudin|Angiomax;Angiox|Therapeutic|Antithrombotic Peptide|23|0|20|2180|IV Infusion|25min|Moderate|none|ACS;PCI;HIT|Approved|2000|Direct thrombin inhibitor peptide derived from hirudin for anticoagulation during coronary intervention
+Enfuvirtide|Fuzeon;T-20|Therapeutic|Antiviral Peptide|24|2|36|4492|SC Injection|3.8h|Low|none|HIV-1 Infection|Approved|2003|First-in-class HIV fusion inhibitor blocking viral entry by binding to gp41
+Triptorelin|Trelstar;Decapeptyl|Therapeutic|GnRH Analog|5|12|10|1311|Intramuscular|7.6h|Moderate|D-Amino Acid Substitution|Prostate Ca;Precocious Puberty;Endometriosis|Approved|2000|GnRH superagonist with depot formulation for hormone-dependent conditions
+Nafarelin|Synarel|Therapeutic|GnRH Analog|5|10|10|1322|Intranasal|3h|Moderate|D-Amino Acid Substitution|Endometriosis;Precocious Puberty|Approved|1990|Intranasal GnRH agonist for endometriosis and central precocious puberty
+Etelcalcetide|Parsabiv|Therapeutic|Neuropeptide|9|0|8|1048|IV Infusion|3d|High|D-Amino Acid Substitution|Secondary Hyperparathyroidism|Approved|2017|Calcimimetic peptide activating CaSR to reduce PTH secretion in dialysis patients
+Angiotensin II|Giapreza|Therapeutic|Neuropeptide|25|1|8|1046|IV Infusion|<1min|Low|none|Vasodilatory Shock;Septic Shock|Approved|2017|Synthetic form of endogenous angiotensin II for treatment of refractory hypotension
+Atosiban|Tractocile|Therapeutic|Oxytocin Analog|11|10|9|994|IV Infusion|18min|Moderate|D-Amino Acid Substitution|Preterm Labor|Approved|2000|Oxytocin and vasopressin receptor antagonist used to delay imminent preterm birth
+Elamipretide|SS-31;Bendavia;MTP-131|Research|Neuropeptide|99|4|4|640|SC Injection|4h|Moderate|D-Amino Acid Substitution|Barth Syndrome;Mitochondrial Myopathy;Heart Failure|Phase 3|null|Mitochondria-targeted tetrapeptide that concentrates in inner mitochondrial membrane to improve bioenergetics
+Larazotide|AT-1001;INN-202|Research|Neuropeptide|99|1|8|897|Oral|1h|Moderate|none|Celiac Disease|Phase 3|null|Tight junction modulator reducing intestinal permeability and gluten-induced symptoms in celiac disease
+GHRP-6|Growth Hormone Releasing Peptide-6|Research|Growth Hormone Releasing Peptide|21|5|6|873|SC Injection|0.3h|Moderate|D-Amino Acid Substitution;Unnatural Amino Acids|Growth Hormone Release;Recovery|Research|null|Synthetic hexapeptide growth hormone secretagogue that stimulates GH release via the ghrelin receptor
+GHRP-2|Pralmorelin;KP-102|Research|Growth Hormone Releasing Peptide|21|5|6|817|SC Injection;IV Infusion|0.25h|Moderate|D-Amino Acid Substitution;Unnatural Amino Acids|Growth Hormone Release;GH Deficiency Diagnosis|Research|null|Synthetic hexapeptide GH secretagogue approved in Japan for diagnostic assessment of GH deficiency
+Hexarelin|Examorelin;HEX|Research|Growth Hormone Releasing Peptide|21|6|6|887|SC Injection;IV Infusion|1h|Moderate|D-Amino Acid Substitution;Unnatural Amino Acids|Growth Hormone Release;Cardiac Function|Research|null|Synthetic hexapeptide GH secretagogue with documented cardioprotective properties independent of GH release
+VIP|Vasoactive Intestinal Peptide;Aviptadil|Research|Neuropeptide|26|5|28|3326|IV Infusion;Intranasal;Inhalation|1min|Low|none|Pulmonary Arterial Hypertension;ARDS;Erectile Dysfunction|Research|null|Endogenous 28-amino acid neuropeptide with vasodilatory immunomodulatory and neuroprotective properties
+Substance P|SP|Research|Neuropeptide|12|5|11|1347|SC Injection;IV Infusion|1min|Low|none|Pain Research;Inflammation Research|Research|null|Undecapeptide neurotransmitter involved in pain perception inflammation and immune modulation via NK1 receptor
+KPV|Lys-Pro-Val;Alpha-MSH C-Terminal|Research|Antimicrobial Peptide|99|6|3|342|Oral;Topical;SC Injection|0.5h|Moderate|none|Gut Inflammation;Wound Healing;Antimicrobial|Research|null|C-terminal tripeptide fragment of alpha-MSH with potent anti-inflammatory and antimicrobial properties`;
 
 // ── Build Functions ──
 
