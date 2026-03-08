@@ -3,12 +3,11 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
-  Tooltip, ReferenceDot, CartesianGrid,
+  Tooltip, ReferenceDot, ReferenceLine, CartesianGrid,
 } from "recharts";
 import { chartMarkerColor, chartMarkerCategory, relativeTime, CHART_MARKER_LEGEND } from "@/lib/catalyst-utils";
 
 interface Catalyst { id: string; date: string; type: string; drugId: string; drugName: string | null; companyId: string; companyName: string; indication: string; }
-interface PricePoint { date: string; price: number; volume: number; }
 
 interface Props {
   companyId: string;
@@ -18,33 +17,17 @@ interface Props {
 }
 
 const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const fmtAxis = (d: string) => { const [y, m] = d.split("-"); return `${MO[parseInt(m) - 1]} '${y.slice(2)}`; };
-const fmtFull = (d: string) => { const [y, m, day] = d.split("-"); return `${MO[parseInt(m) - 1]} ${parseInt(day)}, ${y}`; };
+const toTs = (d: string) => new Date(d + "T00:00:00").getTime();
 const toStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-const todayStr = toStr(new Date());
-
-/** Snap to nearest date in a sorted array */
-function snapToNearest(target: string, dates: string[]): string | null {
-  if (dates.length === 0) return null;
-  if (dates.includes(target)) return target;
-  let lo = 0, hi = dates.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (dates[mid] < target) lo = mid + 1; else hi = mid;
-  }
-  if (lo === 0) return dates[0];
-  if (lo >= dates.length) return dates[dates.length - 1];
-  const before = dates[lo - 1], after = dates[lo];
-  const tb = Math.abs(new Date(target).getTime() - new Date(before).getTime());
-  const ta = Math.abs(new Date(target).getTime() - new Date(after).getTime());
-  return tb <= ta ? before : after;
-}
+const fmtAxis = (ts: number) => { const d = new Date(ts); return `${MO[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`; };
+const fmtFull = (ts: number) => { const d = new Date(ts); return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; };
+const todayTs = toTs(toStr(new Date()));
 
 export default function StockChart({ companyId, ticker, marketCap, catalysts }: Props) {
   const [timeRange, setTimeRange] = useState<"6M"|"1Y"|"2Y">("1Y");
   const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
 
-  const [allData, setAllData] = useState<PricePoint[]>([]);
+  const [allData, setAllData] = useState<{ ts: number; price: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stockName, setStockName] = useState<string | null>(null);
@@ -60,7 +43,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
           setError(`No stock data found for ${ticker}`);
           setAllData([]);
         } else {
-          setAllData(data.prices);
+          setAllData(data.prices.map((p: any) => ({ ts: toTs(p.date), price: p.price })));
           setStockName(data.name || null);
           setCurrentPrice(data.currentPrice || null);
         }
@@ -69,99 +52,125 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
       .finally(() => setLoading(false));
   }, [ticker]);
 
-  // Chart data = real historical prices only, no future extension
-  const chartData = useMemo(() => {
-    const now = new Date();
-    const cutoff = new Date(now);
-    if (timeRange === "6M") cutoff.setMonth(cutoff.getMonth() - 6);
-    else if (timeRange === "1Y") cutoff.setMonth(cutoff.getMonth() - 12);
-    else cutoff.setMonth(cutoff.getMonth() - 24);
-    const cutStr = toStr(cutoff);
-    return allData.filter(d => d.date >= cutStr);
+  // Historical data filtered by time range
+  const historicalData = useMemo(() => {
+    const now = Date.now();
+    let cutoff: number;
+    if (timeRange === "6M") cutoff = now - 6 * 30 * 86400000;
+    else if (timeRange === "1Y") cutoff = now - 365 * 86400000;
+    else cutoff = now - 2 * 365 * 86400000;
+    return allData.filter(d => d.ts >= cutoff);
   }, [allData, timeRange]);
 
-  const tradingDates = useMemo(() => chartData.map(d => d.date), [chartData]);
-
   const lastPrice = useMemo(() => {
-    if (chartData.length === 0) return 0;
-    return chartData[chartData.length - 1].price;
-  }, [chartData]);
+    if (allData.length === 0) return 0;
+    return allData[allData.length - 1].price;
+  }, [allData]);
 
-  const lastDate = useMemo(() => {
-    if (chartData.length === 0) return todayStr;
-    return chartData[chartData.length - 1].date;
-  }, [chartData]);
+  const lastTs = useMemo(() => {
+    if (allData.length === 0) return todayTs;
+    return allData[allData.length - 1].ts;
+  }, [allData]);
 
-  const priceMap = useMemo(() => {
-    const m = new Map<string, number>();
-    chartData.forEach(d => m.set(d.date, d.price));
+  // Build price lookup: ts → price
+  const priceByTs = useMemo(() => {
+    const m = new Map<number, number>();
+    allData.forEach(d => m.set(d.ts, d.price));
     return m;
-  }, [chartData]);
+  }, [allData]);
+
+  // Sorted timestamps for snapping
+  const sortedTs = useMemo(() => allData.map(d => d.ts), [allData]);
 
   const priceChange = useMemo(() => {
-    if (chartData.length < 2) return null;
-    const first = chartData[0].price;
-    const last = chartData[chartData.length - 1].price;
+    if (historicalData.length < 2) return null;
+    const first = historicalData[0].price;
+    const last = historicalData[historicalData.length - 1].price;
     const change = last - first;
     const pct = (change / first) * 100;
     return { change, pct, isUp: change >= 0 };
-  }, [chartData]);
+  }, [historicalData]);
 
-  // ALL catalysts as chart markers — placed ON the price line
-  // Past: snapped to nearest trading day at actual price
-  // Future: placed at end of price line (last date) with small vertical offset to spread them
-  const chartMarkers = useMemo(() => {
-    if (chartData.length === 0) return [];
-    const chartStart = chartData[0].date;
+  // Snap to nearest timestamp
+  function snapTs(target: number): number | null {
+    if (sortedTs.length === 0) return null;
+    let lo = 0, hi = sortedTs.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sortedTs[mid] < target) lo = mid + 1; else hi = mid;
+    }
+    if (lo === 0) return sortedTs[0];
+    if (lo >= sortedTs.length) return sortedTs[sortedTs.length - 1];
+    const before = sortedTs[lo - 1], after = sortedTs[lo];
+    return Math.abs(target - before) <= Math.abs(target - after) ? before : after;
+  }
 
-    const filtered = catalysts
+  // Filtered catalysts
+  const filteredCatalysts = useMemo(() => {
+    return catalysts
       .filter(c => !hiddenCats.has(chartMarkerCategory(c.type)))
       .sort((a, b) => a.date.localeCompare(b.date));
+  }, [catalysts, hiddenCats]);
 
-    // Count future catalysts for vertical offset calculation
-    const futureCats = filtered.filter(c => c.date > lastDate);
-    const priceRange = Math.max(...chartData.map(d => d.price)) - Math.min(...chartData.map(d => d.price));
-    const offsetStep = priceRange * 0.04; // 4% of price range per marker
+  // Chart data: real prices as {ts, price} — numeric x-axis
+  // Plus future catalyst dates as {ts, price: null} to extend x domain
+  const chartData = useMemo(() => {
+    if (historicalData.length === 0) return [];
+    const data: { ts: number; price: number | null }[] =
+      historicalData.map(d => ({ ts: d.ts, price: d.price }));
 
-    let futureIdx = 0;
+    // Add future catalyst dates with null price
+    const futureDates = new Set<number>();
+    filteredCatalysts.forEach(c => {
+      const cts = toTs(c.date);
+      if (cts > lastTs) futureDates.add(cts);
+    });
+    for (const fts of [...futureDates].sort()) {
+      data.push({ ts: fts, price: null });
+    }
 
-    return filtered
+    return data;
+  }, [historicalData, filteredCatalysts, lastTs]);
+
+  // Build markers
+  const chartMarkers = useMemo(() => {
+    if (historicalData.length === 0) return [];
+    const chartStart = historicalData[0].ts;
+
+    return filteredCatalysts
       .map(c => {
-        const isFuture = c.date > lastDate;
+        const cts = toTs(c.date);
+        const isFuture = cts > lastTs;
 
         if (isFuture) {
-          // Place at end of price line, offset vertically so they fan out
-          const idx = futureIdx++;
-          const totalFuture = futureCats.length;
-          // Center the group around lastPrice, offset up
-          const offset = (idx - (totalFuture - 1) / 2) * offsetStep;
-          return { ...c, snappedDate: lastDate, displayPrice: lastPrice + offset, isFuture: true };
+          return { ...c, markerTs: cts, displayPrice: lastPrice, isFuture: true };
         } else {
-          // Past: snap to nearest trading day
-          const snapped = snapToNearest(c.date, tradingDates);
-          if (!snapped) return null;
-          const price = priceMap.get(snapped);
+          const snapped = snapTs(cts);
+          if (snapped === null || snapped < chartStart) return null;
+          const price = priceByTs.get(snapped);
           if (price === undefined) return null;
-          if (snapped < chartStart) return null;
-          return { ...c, snappedDate: snapped, displayPrice: price, isFuture: false };
+          return { ...c, markerTs: snapped, displayPrice: price, isFuture: false };
         }
       })
       .filter((c): c is NonNullable<typeof c> => c !== null);
-  }, [catalysts, hiddenCats, chartData, lastDate, lastPrice, tradingDates, priceMap]);
+  }, [filteredCatalysts, historicalData, lastTs, lastPrice, priceByTs]);
 
-  // Custom tooltip — shown on the chart area
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Tooltip
+  const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
-    const price = payload[0].value;
-    const date = label;
-    // Show catalysts snapped to this date
-    const dayCats = chartMarkers.filter(c => c.snappedDate === date);
+    const item = payload[0].payload;
+    const ts = item.ts as number;
+    const price = item.price as number | null;
+    const isFuture = ts > lastTs;
+    const dayCats = chartMarkers.filter(c => c.markerTs === ts);
     return (
       <div style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, maxWidth: 260 }}>
-        <div className="font-mono text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>{fmtFull(date)}</div>
-        <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>${price.toFixed(2)}</div>
+        <div className="font-mono text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>{fmtFull(ts)}</div>
+        {!isFuture && price != null && (
+          <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>${price.toFixed(2)}</div>
+        )}
         {dayCats.map((c, i) => (
-          <div key={i} className="mt-1.5 pt-1.5" style={{ borderTop: "1px solid var(--color-bd)" }}>
+          <div key={i} className="mt-1.5 pt-1.5" style={{ borderTop: i > 0 || !isFuture ? "1px solid var(--color-bd)" : "none" }}>
             <div className="flex items-center gap-1.5">
               <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: chartMarkerColor(c.type) }} />
               <span className="text-[9px] font-bold" style={{ color: chartMarkerColor(c.type) }}>{c.type}</span>
@@ -169,9 +178,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
             </div>
             <div className="text-[9px] font-semibold mt-0.5" style={{ color: "var(--color-t0)" }}>{c.drugName}</div>
             <div className="text-[8px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
-            <div className="text-[8px] font-mono" style={{ color: chartMarkerColor(c.type) }}>
-              {c.isFuture ? fmtFull(c.date) + " · " : ""}{relativeTime(c.date)}
-            </div>
+            <div className="text-[8px] font-mono" style={{ color: chartMarkerColor(c.type) }}>{relativeTime(c.date)}</div>
           </div>
         ))}
       </div>
@@ -197,16 +204,17 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
     );
   }
 
-  const prices = chartData.map(d => d.price);
-  const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
-  const pad = (maxP - minP) * 0.15 || 1; // extra padding for stacked markers
+  const realPrices = historicalData.map(d => d.price);
+  const minP = Math.min(...realPrices);
+  const maxP = Math.max(...realPrices);
+  const pad = (maxP - minP) * 0.1 || 1;
 
   const toggleCat = (key: string) => {
     setHiddenCats(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   };
 
   const lineColor = priceChange && priceChange.isUp ? "#00f5b0" : "#ff6b6b";
+  const hasFuture = chartMarkers.some(c => c.isFuture);
   const pastCount = chartMarkers.filter(c => !c.isFuture).length;
   const futureCount = chartMarkers.filter(c => c.isFuture).length;
 
@@ -252,7 +260,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
         </div>
       </div>
 
-      {/* Chart — real prices only, all catalysts on the line */}
+      {/* Chart — numeric time x-axis for proportional date spacing */}
       <div style={{ width: "100%", height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 8, left: -10, bottom: 0 }}>
@@ -264,10 +272,14 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#2a3a4e" vertical={false} />
             <XAxis
-              dataKey="date" tickFormatter={fmtAxis}
+              dataKey="ts"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={fmtAxis}
               stroke="#7e92a6" fontSize={8} fontFamily="JetBrains Mono, monospace"
               tickLine={false} axisLine={{ stroke: "#2a3a4e" }}
-              interval={Math.max(1, Math.floor(chartData.length / 8))}
+              tickCount={8}
             />
             <YAxis
               tickFormatter={(v: number) => `$${v.toFixed(0)}`}
@@ -278,20 +290,30 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#7e92a644", strokeDasharray: "3 3" }} />
 
+            {/* Today divider */}
+            {hasFuture && (
+              <ReferenceLine
+                x={lastTs} stroke="#7e92a6" strokeDasharray="4 4" strokeWidth={1}
+                label={{ value: "Today", position: "insideTopRight", fill: "#7e92a6", fontSize: 8, fontFamily: "JetBrains Mono" }}
+              />
+            )}
+
+            {/* Price line — connectNulls=false so line stops at last real price */}
             <Area
               type="monotone" dataKey="price"
               stroke={lineColor} strokeWidth={1.5}
               fill={`url(#sg-${companyId})`}
               dot={false} activeDot={{ r: 3, fill: lineColor, stroke: "#161c26", strokeWidth: 2 }}
+              connectNulls={false}
             />
 
-            {/* All catalyst markers ON the price line */}
+            {/* Catalyst markers at their actual calendar dates */}
             {chartMarkers.map((c, i) => {
               const mc = chartMarkerColor(c.type);
               return (
                 <ReferenceDot
                   key={`cat-${i}`}
-                  x={c.snappedDate} y={c.displayPrice}
+                  x={c.markerTs} y={c.displayPrice}
                   r={7}
                   fill={c.isFuture ? "transparent" : mc}
                   stroke={c.isFuture ? mc : "#0f1319"}
