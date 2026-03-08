@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { PDB } from "@/lib/peptide-data";
 import BioCard from "@/components/ui/BioCard";
+import SectionHeader from "@/components/ui/SectionHeader";
 import PeptideCategoryCard from "@/components/peptides/PeptideCategoryCard";
 import PhaseBadge from "@/components/ui/PhaseBadge";
 
@@ -39,34 +40,39 @@ export default function PeptidesHub() {
   }, []);
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-4">
-        <p className="text-[10px] mt-0.5 leading-relaxed max-w-[600px]" style={{ color: "var(--color-t2)" }}>
-          A structured knowledge base of peptide therapeutics — covering {stats.total} peptides, {stats.targets} biological targets, and {stats.mfgs} manufacturers worldwide.
+    <div style={{ animation: "fi .3s ease-out" }}>
+      {/* Header — mirrors Biotech dashboard structure */}
+      <div className="mb-5">
+        <h1 className="font-serif text-[26px] font-[800] tracking-tight mb-0.5">
+          Peptide <span style={{ color: "var(--color-a2)" }}>Therapeutics Research</span>
+        </h1>
+        <p className="text-[11px]" style={{ color: "var(--color-t2)" }}>
+          {stats.total} peptides · {stats.approved} approved · {stats.targets} targets · {stats.mfgs} manufacturers
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-[7px] mb-5">
+      {/* Stats Grid — matches Biotech card sizing */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(115px,1fr))] gap-[7px] mb-[18px]">
         {([
-          ["Total Peptides", stats.total, "var(--color-a2)"],
-          ["Approved", stats.approved, "#00e676"],
-          ["In Pipeline", stats.pipeline, "var(--color-a3)"],
-          ["Targets", stats.targets, "var(--color-ac)"],
-          ["Manufacturers", stats.mfgs, "#ce93d8"],
-          ["Avg MW (Da)", stats.avgMW.toLocaleString(), "var(--color-t1)"],
-        ] as const).map(([label, value, color]) => (
-          <BioCard key={label}>
-            <div className="text-[8px] font-semibold uppercase tracking-wide mb-0.5 font-mono" style={{ color: "var(--color-t2)" }}>{label}</div>
-            <div className="text-[17px] font-bold font-mono" style={{ color: color as string }}>{value}</div>
+          ["Total Peptides", stats.total],
+          ["Approved", stats.approved],
+          ["In Pipeline", stats.pipeline],
+          ["Targets", stats.targets],
+          ["Manufacturers", stats.mfgs],
+          ["Avg MW (Da)", stats.avgMW.toLocaleString()],
+        ] as const).map(([label, value], i) => (
+          <BioCard key={label} style={{ animation: `fi .3s ease-out ${i * 0.03}s both` }}>
+            <div className="flex items-center gap-1 mb-1.5">
+              <span className="text-[7px] font-semibold uppercase tracking-wide font-mono" style={{ color: "var(--color-t2)" }}>{label}</span>
+            </div>
+            <div className="text-xl font-bold font-mono">{value}</div>
           </BioCard>
         ))}
       </div>
 
       {/* Category Cards */}
-      <div className="text-[10px] font-semibold uppercase tracking-wide mb-2 font-mono" style={{ color: "var(--color-t2)" }}>Explore</div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-[7px] mb-6">
+      <SectionHeader>Explore</SectionHeader>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-[7px] mb-3.5">
         <PeptideCategoryCard
           title="Peptide Dictionary"
           count={PDB.peptides.length}
@@ -94,7 +100,7 @@ export default function PeptidesHub() {
       </div>
 
       {/* Classification Breakdown */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[7px] mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[7px] mb-3.5">
         <BioCard>
           <div className="text-[10px] font-semibold mb-2" style={{ color: "var(--color-t0)" }}>By Classification</div>
           <div className="flex flex-col gap-1.5">
@@ -130,8 +136,8 @@ export default function PeptidesHub() {
       </div>
 
       {/* Featured Peptides */}
-      <div className="text-[10px] font-semibold uppercase tracking-wide mb-2 font-mono" style={{ color: "var(--color-t2)" }}>Featured Peptides</div>
-      <div className="rounded-lg overflow-hidden border" style={{ background: "var(--color-b1)", borderColor: "var(--color-bd)" }}>
+      <SectionHeader>Featured Peptides</SectionHeader>
+      <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--color-bd)" }}>
         <table className="w-full text-[9px]">
           <thead>
             <tr style={{ background: "var(--color-b2)" }}>

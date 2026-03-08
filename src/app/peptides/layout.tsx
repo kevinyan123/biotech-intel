@@ -4,9 +4,7 @@ export default function PeptidesLayout({ children }: { children: React.ReactNode
   return (
     <div>
       <PeptideHeader />
-      <div className="mt-4">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
