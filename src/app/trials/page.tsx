@@ -52,7 +52,7 @@ export default function TrialsPage() {
         <table className="w-full border-collapse text-[10px]">
           <thead>
             <tr style={{ background: "var(--color-b2)", position: "sticky", top: 0, zIndex: 2 }}>
-              {["NCT", "Drug", "Company", "Phase", "Indication", "Status", "N", "Registry", "✓"].map((h) => (
+              {["NCT", "Drug", "Company", "Phase", "Indication", "Status", "Readout", "N", "Registry", "✓"].map((h) => (
                 <th key={h} className="text-left font-semibold uppercase tracking-wider font-mono whitespace-nowrap"
                   style={{ padding: "6px 8px", color: "var(--color-t2)", fontSize: 8, borderBottom: "1px solid var(--color-bd)" }}>{h}</th>
               ))}
@@ -75,6 +75,9 @@ export default function TrialsPage() {
                   <Link href={`/diseases/${encodeURIComponent(r.indication)}`} onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color: "var(--color-a2)" }}>{r.indication}</Link>
                 </td>
                 <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}><StatusDot status={r.status} /></td>
+                <td className="font-mono text-[8px] whitespace-nowrap" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: r.readoutEstimated ? "#ffab66" : "#64b5f6" }}>
+                  {r.readoutDate}{r.readoutEstimated ? " ᴱ" : ""}
+                </td>
                 <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t1)" }}>{r.enrollment}</td>
                 <td className="text-[8px]" style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)", color: "var(--color-t2)" }}>{(r.registry || "CT.gov").replace("ClinicalTrials.gov", "CT.gov")}</td>
                 <td style={{ padding: "5px 8px", borderBottom: "1px solid var(--color-bd)" }}>

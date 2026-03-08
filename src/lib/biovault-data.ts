@@ -32,6 +32,13 @@ const pkN = <T>(a: T[], n: number): T[] => {
   return r;
 };
 const ri = (a: number, b: number) => ~~(R() * (b - a + 1)) + a;
+const TODAY_STR = "2026-03-07";
+/** Derive a readout date from estCompletion (YYYY-MM) by adding a specific day */
+const mkReadout = (estComp: string) => {
+  const day = ri(1, 28);
+  const rd = `${estComp}-${String(day).padStart(2, "0")}`;
+  return { readoutDate: rd, readoutEstimated: rd >= TODAY_STR };
+};
 
 // ── TypeScript Interfaces ──
 
@@ -86,6 +93,8 @@ export interface Trial {
   status: string;
   startDate: string;
   estCompletion: string;
+  readoutDate: string;          // YYYY-MM-DD — actual or estimated data readout date
+  readoutEstimated: boolean;    // true if readout date is estimated (future), false if actual (past)
   endpoint: string;
   companyId: string;
   companyName: string;
@@ -1469,6 +1478,8 @@ function buildDB(): BioVaultDB {
           source: "trial_derived",
         };
         drugs.push(drug);
+        const estComp1 = `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`;
+        const ro1 = mkReadout(estComp1);
         trials.push({
           id: `t${ti}`,
           nctId: `NCT${String(ri(3e6, 9e6)).padStart(8, "0")}`,
@@ -1480,7 +1491,9 @@ function buildDB(): BioVaultDB {
           enrollment: ri(20, 2000),
           status: NORM_STATUS(rawStatus),
           startDate: `${ri(2018, 2025)}-${String(ri(1, 12)).padStart(2, "0")}`,
-          estCompletion: `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`,
+          estCompletion: estComp1,
+          readoutDate: ro1.readoutDate,
+          readoutEstimated: ro1.readoutEstimated,
           endpoint: pk(EP),
           companyId: co.id,
           companyName: co.name,
@@ -1538,6 +1551,8 @@ function buildDB(): BioVaultDB {
                         : co.country === "TW"
                           ? pk(["ClinicalTrials.gov", "ClinicalTrials.gov"])
                           : pk(["ClinicalTrials.gov", "ClinicalTrials.gov", "WHO ICTRP"]);
+          const estComp2 = `${ri(2025, 2030)}-${String(ri(1, 12)).padStart(2, "0")}`;
+          const ro2 = mkReadout(estComp2);
           trials.push({
             id: `t${ti}`,
             nctId: `NCT${String(ri(3e6, 9e6)).padStart(8, "0")}`,
@@ -1549,7 +1564,9 @@ function buildDB(): BioVaultDB {
             enrollment: ri(50, 2000),
             status: NORM_STATUS(rawStatus),
             startDate: `${ri(2020, 2025)}-${String(ri(1, 12)).padStart(2, "0")}`,
-            estCompletion: `${ri(2025, 2030)}-${String(ri(1, 12)).padStart(2, "0")}`,
+            estCompletion: estComp2,
+            readoutDate: ro2.readoutDate,
+            readoutEstimated: ro2.readoutEstimated,
             endpoint: pk(EP),
             companyId: co.id,
             companyName: co.name,
@@ -1599,6 +1616,8 @@ function buildDB(): BioVaultDB {
             : co.country === "GB" || co.country === "FR" || co.country === "DE" || co.country === "BE" || co.country === "NL"
               ? pk(["ClinicalTrials.gov", "EU CTR"])
               : pk(["ClinicalTrials.gov", "ClinicalTrials.gov", "WHO ICTRP"]);
+        const estComp3 = `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`;
+        const ro3 = mkReadout(estComp3);
         trials.push({
           id: `t${ti}`,
           nctId: `NCT${String(ri(3e6, 9e6)).padStart(8, "0")}`,
@@ -1610,7 +1629,9 @@ function buildDB(): BioVaultDB {
           enrollment: ri(10, 3000),
           status: NORM_STATUS(rawStatus),
           startDate: `${ri(2017, 2025)}-${String(ri(1, 12)).padStart(2, "0")}`,
-          estCompletion: `${ri(2025, 2031)}-${String(ri(1, 12)).padStart(2, "0")}`,
+          estCompletion: estComp3,
+          readoutDate: ro3.readoutDate,
+          readoutEstimated: ro3.readoutEstimated,
           endpoint: pk(EP),
           companyId: co.id,
           companyName: co.name,
@@ -1651,20 +1672,44 @@ function buildDB(): BioVaultDB {
   });
 
   const catalysts: Catalyst[] = [];
-  // Scale catalysts with dataset size — more companies = more events
-  const catCount = Math.min(900, Math.max(250, ~~(drugs.length * 0.15)));
-  for (let i = 0; i < catCount; i++) {
+
+  // ── Data Readout catalysts: one per trial, backed by trial.readoutDate ──
+  // Every trial generates exactly one readout catalyst so every trial has a
+  // corresponding point on the catalyst chart.
+  trials.forEach((t, i) => {
+    const drug = drugs.find(d => d.id === t.drugId);
+    if (!drug) return;
+    // Map trial phase → readout type (all map to "results" category)
+    let rdType: string;
+    if (/3/.test(t.phase) || t.phase === "NDA/BLA" || t.phase === "Approved") rdType = "Ph3 Readout";
+    else if (/2/.test(t.phase)) rdType = "Ph2 Data";
+    else rdType = "Interim"; // Ph1, Preclinical — still shows as Data Readout
+    catalysts.push({
+      id: `kr${i}`,
+      date: t.readoutDate,
+      type: rdType,
+      drugId: drug.id,
+      drugCode: drug.code,
+      drugName: drug.name || drug.code,
+      companyId: drug.companyId,
+      companyName: drug.companyName,
+      indication: t.indication,
+    });
+  });
+
+  // ── Non-readout catalysts (regulatory, enrollment, conferences) ──
+  const otherTypes = ["PDUFA", "Conference", "AdCom", "NDA", "EMA Filing", "BTD", "Fast Track", "Orphan Drug", "Ph1 Dose Esc", "Enrollment Complete"];
+  const otherCount = Math.min(600, Math.max(150, ~~(drugs.length * 0.1)));
+  for (let i = 0; i < otherCount; i++) {
     const d = pk(drugs);
-    // Generate dates from Jul 2025 to Dec 2026 (18 months)
-    // ~44% past (Jul'25–Feb'26), ~56% future (Mar'26+)
-    const mOff = ri(0, 17);           // 0=Jul'25 … 5=Dec'25, 6=Jan'26 … 17=Dec'26
-    const baseMonth = 7 + mOff;       // 7–24
+    const mOff = ri(0, 17);
+    const baseMonth = 7 + mOff;
     const catYear = baseMonth > 12 ? 2026 : 2025;
     const catMonth = baseMonth > 12 ? baseMonth - 12 : baseMonth;
     catalysts.push({
-      id: `k${i}`,
+      id: `ko${i}`,
       date: `${catYear}-${String(catMonth).padStart(2, "0")}-${String(ri(1, 28)).padStart(2, "0")}`,
-      type: pk(["Ph3 Readout", "PDUFA", "Ph2 Data", "Conference", "AdCom", "NDA", "EMA Filing", "Interim", "BTD", "Fast Track", "Orphan Drug", "Ph1 Dose Esc", "Enrollment Complete"]),
+      type: pk(otherTypes),
       drugId: d.id,
       drugCode: d.code,
       drugName: d.name || d.code,
@@ -1673,26 +1718,7 @@ function buildDB(): BioVaultDB {
       indication: pk(d.indications),
     });
   }
-  // Add trial completion milestones for trials completing in 2025–2026
-  let milestoneId = catCount;
-  trials.forEach(t => {
-    if (t.estCompletion && (t.estCompletion.startsWith("2026") || t.estCompletion.startsWith("2025"))) {
-      const drug = drugs.find(d => d.id === t.drugId);
-      if (drug) {
-        catalysts.push({
-          id: `k${milestoneId++}`,
-          date: `${t.estCompletion}-${String(ri(1, 28)).padStart(2, "0")}`,
-          type: t.phase.includes("3") ? "Ph3 Readout" : t.phase.includes("2") ? "Ph2 Data" : "Enrollment Complete",
-          drugId: drug.id,
-          drugCode: drug.code,
-          drugName: drug.name || drug.code,
-          companyId: drug.companyId,
-          companyName: drug.companyName,
-          indication: t.indication,
-        });
-      }
-    }
-  });
+
   catalysts.sort((a, b) => a.date.localeCompare(b.date));
 
   return { companies, drugs, trials, catalysts };

@@ -71,6 +71,7 @@ export default function TrialDetailPage({ params }: { params: Promise<{ id: stri
           { l: "Endpoint", v: t.endpoint },
           { l: "Start", v: t.startDate, rel: relativeTime(t.startDate), relColor: "var(--color-a2)" },
           { l: "Completion", v: t.estCompletion, rel: relativeTime(t.estCompletion), relColor: daysRemaining > 0 ? "var(--color-ac)" : "#64b5f6" },
+          { l: "Data Readout", v: t.readoutDate, rel: t.readoutEstimated ? "Estimated" : relativeTime(t.readoutDate), relColor: t.readoutEstimated ? "#ffab66" : "#64b5f6" },
         ].map((s, i) => (
           <BioCard key={i}>
             <div className="text-[8px] font-semibold uppercase tracking-wide mb-0.5 font-mono" style={{ color: "var(--color-t2)" }}>{s.l}</div>
