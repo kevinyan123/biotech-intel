@@ -76,7 +76,7 @@ export default function PeptidesHub() {
         <PeptideCategoryCard
           title="Peptide Dictionary"
           count={PDB.peptides.length}
-          description="Searchable glossary of therapeutic peptides with mechanisms, targets, and clinical status."
+          description="Educational knowledge base covering benefits, mechanisms, administration, and use cases."
           href="/peptides/dictionary"
           icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64b5f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>}
           preview={PDB.peptides.filter(p => p.phase === "Approved").slice(0, 3).map(p => `${p.name} — ${p.class}`)}

@@ -1,24 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════
 // PEPTIDE DATA MODULE — Therapeutic Peptides Knowledge Base
-// Interfaces, Seed Data, Procedural Generation
+// Interfaces, Seed Data, Educational Data Merge
 // ═══════════════════════════════════════════════════════════════════════
 
 import { DB } from "./biovault-data";
-
-// ── Seeded RNG (isolated from main DB) ──
-
-function S(s: number) {
-  let x = s;
-  return () => { x = (x * 16807) % 2147483647; return (x - 1) / 2147483646; };
-}
-const R = S(7077);
-const pk = <T>(a: readonly T[]): T => a[~~(R() * a.length)];
-const pkN = <T>(a: readonly T[], n: number): T[] => {
-  const s = [...a], r: T[] = [];
-  for (let i = 0; i < Math.min(n, s.length); i++) r.push(s.splice(~~(R() * s.length), 1)[0]);
-  return r;
-};
-const ri = (a: number, b: number) => ~~(R() * (b - a + 1)) + a;
+import { PEPTIDE_EDUCATION } from "./peptide-education-data";
 
 // ── Controlled Vocabularies ──
 
@@ -28,6 +14,7 @@ export const PEPTIDE_CLASSES = [
   "Neuropeptide", "Opioid Peptide", "Melanocortin Agonist", "Calcitonin Analog",
   "PTH Analog", "Insulin Analog", "GnRH Analog", "Proteasome Inhibitor",
   "Guanylate Cyclase Agonist", "BPI Mimetic", "Amylin Analog", "Endothelin Antagonist",
+  "Growth Hormone Secretagogue", "Growth Hormone Releasing Peptide",
 ] as const;
 
 export const PEPTIDE_CLASSIFICATIONS = ["Therapeutic", "Diagnostic", "Research"] as const;
@@ -55,6 +42,13 @@ export const TARGET_FAMILIES = [
   "Transporter", "Receptor Tyrosine Kinase", "Protease",
 ] as const;
 
+export const PEPTIDE_USE_CASES = [
+  "Recovery", "Muscle Growth", "Fat Loss", "Anti-Aging", "Cognitive Support",
+  "Gut Health", "Joint Support", "Immune Support", "Sleep", "Sexual Health",
+  "Skin Health", "Hair Growth", "Metabolic Health", "Bone Health",
+  "Cardiovascular", "Neuroprotection", "Anti-Inflammatory", "Wound Healing",
+] as const;
+
 // ── Interfaces ──
 
 export interface Peptide {
@@ -78,6 +72,19 @@ export interface Peptide {
   source: string;
   drugIds: string[];
   companyIds: string[];
+  // Educational fields
+  primaryBenefit: string;
+  shortSummary: string;
+  benefits: string;
+  administrationMethod: string;
+  administrationDetails: string;
+  storage: string;
+  mechanism: string;
+  useCases: string[];
+  stacks: string[];
+  safetyNotes: string;
+  researchBackground: string;
+  relatedPeptideIds: string[];
 }
 
 export interface PeptideTarget {
@@ -133,7 +140,10 @@ NPR-A|Natriuretic Peptide Receptor A|Enzyme|Natriuretic|null|Receptor for ANP an
 Integrin αIIbβ3|Glycoprotein IIb/IIIa|Receptor Tyrosine Kinase|Coagulation|null|Fibrinogen receptor on platelets mediating aggregation
 AMYR|Amylin Receptor|GPCR|Glucose Metabolism|null|Calcitonin receptor complex modulating gastric emptying
 ETR-A|Endothelin Receptor Type A|GPCR|Vasoconstriction|null|Mediates endothelin-1 induced vasoconstriction
-N-type Ca|N-Type Calcium Channel|Ion Channel|Pain Signaling|null|Voltage-gated calcium channel in dorsal horn nociception`;
+N-type Ca|N-Type Calcium Channel|Ion Channel|Pain Signaling|null|Voltage-gated calcium channel in dorsal horn nociception
+GHRH-R|Growth Hormone Releasing Hormone Receptor|GPCR|GHRH|null|Mediates growth hormone release from anterior pituitary somatotrophs
+GHS-R|Growth Hormone Secretagogue Receptor|GPCR|Ghrelin|null|Receptor for ghrelin and synthetic growth hormone secretagogues
+KISS1R|Kisspeptin Receptor|GPCR|HPG Axis|null|Key regulator of GnRH neuron activity and pubertal development`;
 
 // ── Seed Data: Manufacturers ──
 // Format: name|hq|country|type|founded|website|specialties (;-separated)|capabilities (;-separated)
@@ -191,7 +201,27 @@ Imeglimin|Twymeeg|Therapeutic|GLP-1 Agonist|0|6|0|209|Oral|5h|High|Backbone Modi
 CagriSema|NN9535+NN9838|Therapeutic|Amylin Analog|0,17|11|37|4018|SC Injection|168h|High|Acylation;Albumin Binding|Obesity;T2D|Phase 3|null|Fixed-dose combination of semaglutide and cagrilintide (amylin analog)
 Rusfertide|PTG-300|Therapeutic|BPI Mimetic|17|9|22|2567|SC Injection|40h|Moderate|PEGylation;Cyclization|PV;Hemochromatosis|Phase 3|null|Hepcidin mimetic peptide reducing iron-driven erythrocytosis
 Zilucoplan|RA101495|Therapeutic|Neuropeptide|14|4|15|1782|SC Injection|25h|Moderate|Cyclization;PEGylation|MG;PNH;NMOSD|Approved|2023|Macrocyclic peptide complement C5 inhibitor for myasthenia gravis
-Difelikefalin|Korsuva|Therapeutic|Opioid Peptide|19|3|4|579|IV Infusion|2h|Moderate|D-Amino Acid Substitution|CKD-Associated Pruritus;Prurigo Nodularis|Approved|2021|Peripherally acting kappa opioid receptor agonist for itch`;
+Difelikefalin|Korsuva|Therapeutic|Opioid Peptide|19|3|4|579|IV Infusion|2h|Moderate|D-Amino Acid Substitution|CKD-Associated Pruritus;Prurigo Nodularis|Approved|2021|Peripherally acting kappa opioid receptor agonist for itch
+BPC-157|Body Protection Compound-157|Research|Neuropeptide|99|5|15|1419|SC Injection;Oral|2h|Moderate|none|Gut Healing;Tendon Repair;Wound Healing|Research|null|Gastric pentadecapeptide with broad tissue-protective and regenerative properties
+TB-500|Thymosin Beta-4 Fragment|Research|Neuropeptide|99|5|43|4963|SC Injection|2h|Moderate|none|Tissue Repair;Inflammation;Wound Healing|Research|null|Synthetic fragment of thymosin beta-4 promoting tissue repair and reducing inflammation
+Thymosin Beta-4|Tβ4|Research|Neuropeptide|99|5|43|4963|SC Injection|2h|Low|none|Wound Healing;Tissue Repair;Cell Migration|Research|null|Naturally occurring peptide involved in tissue repair cell migration and anti-inflammatory processes
+Thymosin Alpha-1|Zadaxin;Tα1|Therapeutic|Neuropeptide|99|6|28|3108|SC Injection|2h|Moderate|none|Immune Modulation;Hepatitis B;Hepatitis C|Approved|1999|Thymic peptide that enhances immune function by modulating T-cell and dendritic cell activity
+CJC-1295|CJC-1295 DAC;Modified GRF 1-29|Research|Growth Hormone Secretagogue|20|5|30|3367|SC Injection|8d|High|Lipidation|Growth Hormone Deficiency;Anti-Aging|Research|null|Synthetic GHRH analog with Drug Affinity Complex for extended growth hormone release
+Ipamorelin|NNC 26-0161|Research|Growth Hormone Releasing Peptide|21|6|5|711|SC Injection|2h|Moderate|none|Growth Hormone Release;Recovery;Anti-Aging|Research|null|Selective growth hormone secretagogue with minimal effect on cortisol and prolactin
+AOD-9604|Anti-Obesity Drug 9604|Research|Neuropeptide|99|5|16|1815|SC Injection|1h|Moderate|none|Fat Loss;Metabolism|Research|null|Modified fragment of human growth hormone (hGH 177-191) studied for fat metabolism
+GHK-Cu|Copper Peptide GHK|Research|Neuropeptide|99|6|3|403|Topical;SC Injection|1h|Moderate|none|Skin Rejuvenation;Wound Healing;Hair Growth|Research|null|Tripeptide-copper complex with tissue remodeling and anti-aging properties
+PT-141|Bremelanotide;Vyleesi|Therapeutic|Melanocortin Agonist|6|9|7|1025|SC Injection|2.7h|Moderate|Cyclization|Hypoactive Sexual Desire Disorder|Approved|2019|Melanocortin receptor agonist for hypoactive sexual desire disorder in premenopausal women
+DSIP|Delta Sleep-Inducing Peptide|Research|Neuropeptide|99|5|9|848|SC Injection;IV Infusion|0.25h|Low|none|Insomnia;Sleep Disorders|Research|null|Neuropeptide originally isolated from rabbit brain involved in sleep regulation
+Melanotan II|MT-II|Research|Melanocortin Agonist|6|6|7|1024|SC Injection|1h|Moderate|Cyclization|Skin Tanning;Sexual Dysfunction|Research|null|Synthetic analog of alpha-melanocyte stimulating hormone with broad melanocortin receptor activity
+MOTS-c|Mitochondrial ORF of Twelve S rRNA Type-c|Research|Neuropeptide|99|5|16|2174|SC Injection|2h|Moderate|none|Metabolic Regulation;Exercise Mimetic|Research|null|Mitochondrial-derived peptide that regulates metabolic homeostasis and insulin sensitivity
+Kisspeptin|Kisspeptin-54;Metastin|Research|Neuropeptide|22|5|54|5861|IV Infusion;SC Injection|0.5h|Low|none|Reproductive Function;Puberty|Research|null|Hypothalamic neuropeptide that stimulates GnRH release and regulates reproductive function
+Sermorelin|Geref;GRF 1-29|Therapeutic|Growth Hormone Secretagogue|20|10|29|3357|SC Injection|0.2h|Low|none|Growth Hormone Deficiency;Anti-Aging|Approved|1997|Synthetic analog of growth hormone releasing hormone fragment 1-29
+Tesamorelin|Egrifta|Therapeutic|Growth Hormone Secretagogue|20|0|44|5135|SC Injection|0.4h|Moderate|none|HIV Lipodystrophy;Abdominal Fat|Approved|2010|Synthetic GHRH analog for reducing excess abdominal fat in HIV-associated lipodystrophy
+Epitalon|Epithalon;Epithalone|Research|Neuropeptide|99|5|4|390|SC Injection|2h|Moderate|none|Anti-Aging;Telomere Elongation|Research|null|Synthetic tetrapeptide based on epithalamin studied for telomerase activation
+LL-37|Cathelicidin|Research|Antimicrobial Peptide|99|5|37|4493|Topical;SC Injection|1h|Low|none|Antimicrobial;Wound Healing;Immune Modulation|Research|null|Human cathelicidin antimicrobial peptide with broad-spectrum antimicrobial and immunomodulatory properties
+Selank|TP-7|Therapeutic|Neuropeptide|99|6|7|751|Intranasal|1h|Moderate|none|Anxiety;Cognitive Enhancement|Approved|2009|Synthetic analog of tuftsin with anxiolytic and nootropic properties
+Semax|ACTH 4-10 Analog|Therapeutic|Neuropeptide|99|6|7|813|Intranasal|1h|Moderate|none|Cognitive Enhancement;Neuroprotection|Approved|2011|Synthetic analog of ACTH fragment 4-10 with neuroprotective and cognitive-enhancing properties
+Gonadorelin|Factrel;Lutrepulse|Therapeutic|GnRH Analog|5|10|10|1182|SC Injection;IV Infusion|0.2h|Low|none|Hypogonadism;Fertility Testing|Approved|1982|Synthetic gonadotropin-releasing hormone for diagnostic and therapeutic use`;
 
 // ── Build Functions ──
 
@@ -269,57 +299,55 @@ function parsePeptides(targets: PeptideTarget[], mfgs: PeptideManufacturer[]): P
       source: "curated",
       drugIds: [],
       companyIds: [],
+      // Educational defaults (merged later)
+      primaryBenefit: "",
+      shortSummary: "",
+      benefits: "",
+      administrationMethod: "",
+      administrationDetails: "",
+      storage: "",
+      mechanism: "",
+      useCases: [],
+      stacks: [],
+      safetyNotes: "",
+      researchBackground: "",
+      relatedPeptideIds: [],
     };
   });
 }
 
-// ── Procedural Generation ──
+// ── Educational Data Merge ──
 
-const GEN_PREFIXES = ["KBY", "PEP", "PTG", "ZP", "BIO", "NVP", "AZD", "LY", "MK", "GSK", "BMT", "RTX", "APX", "VLX", "NEP"];
-const GEN_SUFFIXES = ["-101", "-201", "-301", "-401", "-501", "-601", "-701", "-1001", "-2001", "-3001", "-014", "-022", "-037", "-045", "-089"];
-const GEN_INDICATIONS = ["NSCLC", "Breast Ca", "CRC", "Pancreatic Ca", "T2D", "Obesity", "NASH", "RA", "Psoriasis", "Crohn's", "UC", "SLE", "Migraine", "Osteoporosis", "Asthma", "CKD", "Heart Failure", "IPF", "Atopic Derm", "MDD"];
-const GEN_PHASES = ["Preclinical", "Phase 1", "Phase 1/2", "Phase 2", "Phase 2/3", "Phase 3"];
-
-function generatePeptides(targets: PeptideTarget[], mfgs: PeptideManufacturer[], startIdx: number): Peptide[] {
-  const gen: Peptide[] = [];
-  const count = ri(25, 35);
-  for (let i = 0; i < count; i++) {
-    const code = pk(GEN_PREFIXES) + pk(GEN_SUFFIXES);
-    const tgt = targets[ri(0, targets.length - 1)];
-    const cls = pk(PEPTIDE_CLASSES);
-    const phase = pk(GEN_PHASES);
-    const nMods = ri(0, 3);
-    const mods = pkN([...PEPTIDE_MODIFICATIONS], nMods);
-    const nInds = ri(1, 3);
-    const inds = pkN([...GEN_INDICATIONS], nInds);
-    const residues = ri(5, 55);
-    const mw = residues * ri(95, 135);
-    const mfg = mfgs[ri(0, mfgs.length - 1)];
-
-    gen.push({
-      id: `pep-${startIdx + i}`,
-      name: code,
-      aliases: [],
-      classification: R() < 0.85 ? "Therapeutic" : R() < 0.5 ? "Diagnostic" : "Research",
-      class: cls,
-      targetIds: [tgt.id],
-      manufacturerIds: [mfg.id],
-      residues,
-      molecularWeight: mw,
-      route: pk(PEPTIDE_ROUTES),
-      halfLife: `${ri(1, 200)}h`,
-      stability: pk(["High", "Moderate", "Low"] as const),
-      modifications: mods,
-      indications: inds,
-      phase,
-      approvalYear: null,
-      description: `Investigational ${cls.toLowerCase()} peptide targeting ${tgt.name} in ${phase.toLowerCase()} development`,
-      source: "generated",
-      drugIds: [],
-      companyIds: [],
-    });
+function mergeEducationalData(peptides: Peptide[]): void {
+  for (const pep of peptides) {
+    const edu = PEPTIDE_EDUCATION[pep.name];
+    if (edu) {
+      pep.primaryBenefit = edu.primaryBenefit;
+      pep.shortSummary = edu.shortSummary;
+      pep.benefits = edu.benefits;
+      pep.administrationMethod = edu.administrationMethod;
+      pep.administrationDetails = edu.administrationDetails;
+      pep.storage = edu.storage;
+      pep.mechanism = edu.mechanism;
+      pep.useCases = edu.useCases;
+      pep.stacks = edu.stacks;
+      pep.safetyNotes = edu.safetyNotes;
+      pep.researchBackground = edu.researchBackground;
+    }
   }
-  return gen;
+}
+
+function resolveRelatedPeptides(peptides: Peptide[]): void {
+  const nameToId = new Map<string, string>();
+  for (const pep of peptides) nameToId.set(pep.name, pep.id);
+  for (const pep of peptides) {
+    const edu = PEPTIDE_EDUCATION[pep.name];
+    if (edu?.relatedPeptideNames) {
+      pep.relatedPeptideIds = edu.relatedPeptideNames
+        .map(name => nameToId.get(name))
+        .filter((id): id is string => !!id);
+    }
+  }
 }
 
 // ── Cross-Linking ──
@@ -362,9 +390,9 @@ function crossLink(peptides: Peptide[], targets: PeptideTarget[], mfgs: PeptideM
 function buildPeptideDB(): PeptideDB {
   const targets = parseTargets();
   const manufacturers = parseManufacturers();
-  const seeded = parsePeptides(targets, manufacturers);
-  const generated = generatePeptides(targets, manufacturers, seeded.length);
-  const peptides = [...seeded, ...generated];
+  const peptides = parsePeptides(targets, manufacturers);
+  mergeEducationalData(peptides);
+  resolveRelatedPeptides(peptides);
   crossLink(peptides, targets, manufacturers);
   return { peptides, targets, manufacturers };
 }

@@ -2,177 +2,227 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { PDB, PEPTIDE_CLASSES, PEPTIDE_CLASSIFICATIONS, PEPTIDE_ROUTES } from "@/lib/peptide-data";
-import PhaseBadge from "@/components/ui/PhaseBadge";
-import PeptideClassBadge from "@/components/peptides/PeptideClassBadge";
-import { PH } from "@/lib/biovault-data";
-
-const PER_PAGE = 50;
+import { PDB, PEPTIDE_USE_CASES } from "@/lib/peptide-data";
+import BioCard from "@/components/ui/BioCard";
 
 export default function PeptideDictionaryPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [classF, setClassF] = useState<string | null>(null);
-  const [clsF, setClsF] = useState<string | null>(null);
-  const [phaseF, setPhaseF] = useState<string | null>(null);
-  const [routeF, setRouteF] = useState<string | null>(null);
-  const [sort, setSort] = useState("phase");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [pg, setPg] = useState(0);
+  const [useCaseF, setUseCaseF] = useState<string | null>(null);
+  const [adminF, setAdminF] = useState<string | null>(null);
+  const [letter, setLetter] = useState<string | null>(null);
 
-  const PHASE_ORDER = ["Approved", "NDA/BLA", "Phase 3", "Phase 2/3", "Phase 2", "Phase 1/2", "Phase 1", "Preclinical"];
+  // Unique admin methods present in data
+  const adminMethods = useMemo(() => {
+    const set = new Set<string>();
+    PDB.peptides.forEach(p => {
+      if (p.administrationMethod) set.add(p.administrationMethod);
+      else p.route.split(";").forEach(r => set.add(r.trim()));
+    });
+    return [...set].sort();
+  }, []);
+
+  // Available first letters
+  const letters = useMemo(() => {
+    const set = new Set<string>();
+    PDB.peptides.forEach(p => set.add(p.name[0].toUpperCase()));
+    return [...set].sort();
+  }, []);
+
+  // Use cases that actually appear in data
+  const activeCases = useMemo(() => {
+    const set = new Set<string>();
+    PDB.peptides.forEach(p => p.useCases.forEach(u => set.add(u)));
+    return PEPTIDE_USE_CASES.filter(u => set.has(u));
+  }, []);
 
   const filtered = useMemo(() => {
     let d = PDB.peptides;
-    if (classF) d = d.filter(p => p.classification === classF);
-    if (clsF) d = d.filter(p => p.class === clsF);
-    if (phaseF) d = d.filter(p => p.phase === phaseF);
-    if (routeF) d = d.filter(p => p.route.includes(routeF));
+
+    if (letter) d = d.filter(p => p.name[0].toUpperCase() === letter);
+
+    if (useCaseF) d = d.filter(p => p.useCases.includes(useCaseF));
+
+    if (adminF) {
+      d = d.filter(p =>
+        p.administrationMethod === adminF || p.route.includes(adminF)
+      );
+    }
+
     if (search) {
       const q = search.toLowerCase();
       d = d.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.aliases.some(a => a.toLowerCase().includes(q)) ||
-        p.class.toLowerCase().includes(q)
+        p.primaryBenefit.toLowerCase().includes(q) ||
+        p.shortSummary.toLowerCase().includes(q) ||
+        p.useCases.some(u => u.toLowerCase().includes(q))
       );
     }
-    d = [...d].sort((a, b) => {
-      let cmp = 0;
-      switch (sort) {
-        case "name": cmp = a.name.localeCompare(b.name); break;
-        case "class": cmp = a.class.localeCompare(b.class); break;
-        case "phase": cmp = PHASE_ORDER.indexOf(a.phase) - PHASE_ORDER.indexOf(b.phase); break;
-        case "mw": cmp = a.molecularWeight - b.molecularWeight; break;
-        default: cmp = 0;
-      }
-      return sortDir === "desc" ? -cmp : cmp;
-    });
-    return d;
-  }, [search, classF, clsF, phaseF, routeF, sort, sortDir]);
 
-  const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const pageData = filtered.slice(pg * PER_PAGE, (pg + 1) * PER_PAGE);
+    return [...d].sort((a, b) => a.name.localeCompare(b.name));
+  }, [search, useCaseF, adminF, letter]);
 
-  const toggleSort = (col: string) => {
-    if (sort === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSort(col); setSortDir("asc"); }
-  };
-
-  const sel = (v: string | null, fn: (v: string | null) => void, label: string, opts: readonly string[]) => (
-    <select value={v || ""} onChange={e => { fn(e.target.value || null); setPg(0); }}
-      className="rounded px-[5px] py-[3px] text-[9px] outline-none cursor-pointer"
-      style={{ background: "var(--color-b2)", color: v ? "var(--color-a2)" : "var(--color-t2)", border: `1px solid ${v ? "rgba(100,181,246,0.3)" : "var(--color-bd)"}` }}>
-      <option value="">{label}</option>
-      {opts.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  );
-
-  // Unique classes present in data
-  const uniqueClasses = useMemo(() => [...new Set(PDB.peptides.map(p => p.class))].sort(), []);
-  const uniqueRoutes = useMemo(() => [...new Set(PDB.peptides.flatMap(p => p.route.split(";")))].sort(), []);
+  const hasFilters = !!(search || useCaseF || adminF || letter);
 
   return (
     <div>
       <h1 className="font-serif font-[800] text-[18px] tracking-tight mb-1" style={{ color: "var(--color-t0)" }}>
-        Peptide Dictionary <span className="text-[12px] font-mono font-normal" style={{ color: "var(--color-t2)" }}>({filtered.length})</span>
+        Peptide Dictionary{" "}
+        <span className="text-[12px] font-mono font-normal" style={{ color: "var(--color-t2)" }}>
+          ({filtered.length})
+        </span>
       </h1>
-      <p className="text-[9px] mb-3" style={{ color: "var(--color-t2)" }}>Searchable glossary of therapeutic, diagnostic, and research peptides.</p>
+      <p className="text-[9px] mb-3" style={{ color: "var(--color-t2)" }}>
+        Educational knowledge base covering benefits, mechanisms, administration, and use cases.
+      </p>
 
       {/* Filters */}
-      <div className="flex items-center gap-1.5 flex-wrap mb-3">
-        <input value={search} onChange={e => { setSearch(e.target.value); setPg(0); }}
+      <div className="flex items-center gap-1.5 flex-wrap mb-2">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
           placeholder="Search peptides…"
-          className="rounded px-[7px] py-[3px] text-[9px] outline-none w-[150px]"
-          style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd)", color: "var(--color-t0)" }} />
-        {sel(classF, setClassF, "Classification", PEPTIDE_CLASSIFICATIONS)}
-        {sel(clsF, setClsF, "Class", uniqueClasses)}
-        {sel(phaseF, setPhaseF, "Phase", PH)}
-        {sel(routeF, setRouteF, "Route", uniqueRoutes)}
-        {(classF || clsF || phaseF || routeF || search) && (
-          <button onClick={() => { setClassF(null); setClsF(null); setPhaseF(null); setRouteF(null); setSearch(""); setPg(0); }}
+          className="rounded px-[7px] py-[3px] text-[9px] outline-none w-[170px]"
+          style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd)", color: "var(--color-t0)" }}
+        />
+        <select
+          value={useCaseF || ""}
+          onChange={e => setUseCaseF(e.target.value || null)}
+          className="rounded px-[5px] py-[3px] text-[9px] outline-none cursor-pointer"
+          style={{
+            background: "var(--color-b2)",
+            color: useCaseF ? "var(--color-a2)" : "var(--color-t2)",
+            border: `1px solid ${useCaseF ? "rgba(100,181,246,0.3)" : "var(--color-bd)"}`,
+          }}
+        >
+          <option value="">Use Case</option>
+          {activeCases.map(u => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
+        <select
+          value={adminF || ""}
+          onChange={e => setAdminF(e.target.value || null)}
+          className="rounded px-[5px] py-[3px] text-[9px] outline-none cursor-pointer"
+          style={{
+            background: "var(--color-b2)",
+            color: adminF ? "var(--color-a2)" : "var(--color-t2)",
+            border: `1px solid ${adminF ? "rgba(100,181,246,0.3)" : "var(--color-bd)"}`,
+          }}
+        >
+          <option value="">Admin Method</option>
+          {adminMethods.map(m => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(""); setUseCaseF(null); setAdminF(null); setLetter(null); }}
             className="rounded px-1.5 py-[3px] text-[9px] cursor-pointer"
-            style={{ background: "rgba(255,107,107,0.1)", color: "var(--color-rd)", border: "1px solid rgba(255,107,107,0.15)" }}>
+            style={{ background: "rgba(255,107,107,0.1)", color: "var(--color-rd)", border: "1px solid rgba(255,107,107,0.15)" }}
+          >
             Clear
           </button>
         )}
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg overflow-hidden border" style={{ background: "var(--color-b1)", borderColor: "var(--color-bd)" }}>
-        <div style={{ maxHeight: "65vh", overflowY: "auto" }}>
-          <table className="w-full text-[9px]">
-            <thead className="sticky top-0 z-10">
-              <tr style={{ background: "var(--color-b2)" }}>
-                {([
-                  ["Peptide", "name"], ["Classification", null], ["Class", "class"],
-                  ["Phase", "phase"], ["Target", null], ["MW (Da)", "mw"],
-                  ["Route", null], ["Modifications", null],
-                ] as const).map(([label, key]) => (
-                  <th key={label}
-                    className={`text-left px-2 py-1.5 font-semibold font-mono ${key ? "cursor-pointer select-none" : ""}`}
-                    style={{ color: sort === key ? "var(--color-a2)" : "var(--color-t2)", borderBottom: "1px solid var(--color-bd)" }}
-                    onClick={() => key && toggleSort(key)}>
-                    {label}{sort === key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pageData.map((pep, i) => {
-                const tgt = PDB.targets.find(t => t.id === pep.targetIds[0]);
-                return (
-                  <tr key={pep.id}
-                    className="cursor-pointer transition-colors"
-                    style={{ animation: `fi 0.2s ${i * 0.02}s both` }}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--color-bh)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                    onClick={() => router.push(`/peptides/dictionary/${pep.id}`)}>
-                    <td className="px-2 py-1.5 font-semibold" style={{ color: "var(--color-a2)", borderBottom: "1px solid var(--color-bd)" }}>
-                      {pep.name}
-                      {pep.aliases.length > 0 && <span className="font-normal ml-1 text-[8px]" style={{ color: "var(--color-t2)" }}>({pep.aliases[0]})</span>}
-                    </td>
-                    <td className="px-2 py-1.5" style={{ borderBottom: "1px solid var(--color-bd)" }}><PeptideClassBadge classification={pep.classification} /></td>
-                    <td className="px-2 py-1.5" style={{ color: "var(--color-t1)", borderBottom: "1px solid var(--color-bd)" }}>{pep.class}</td>
-                    <td className="px-2 py-1.5" style={{ borderBottom: "1px solid var(--color-bd)" }}><PhaseBadge phase={pep.phase} /></td>
-                    <td className="px-2 py-1.5 font-mono" style={{ color: "var(--color-ac)", borderBottom: "1px solid var(--color-bd)" }}>{tgt?.name || "—"}</td>
-                    <td className="px-2 py-1.5 font-mono" style={{ color: "var(--color-t2)", borderBottom: "1px solid var(--color-bd)" }}>
-                      {pep.molecularWeight > 0 ? pep.molecularWeight.toLocaleString() : "—"}
-                    </td>
-                    <td className="px-2 py-1.5" style={{ color: "var(--color-t2)", borderBottom: "1px solid var(--color-bd)" }}>{pep.route}</td>
-                    <td className="px-2 py-1.5" style={{ borderBottom: "1px solid var(--color-bd)" }}>
-                      <div className="flex flex-wrap gap-0.5">
-                        {pep.modifications.slice(0, 2).map(m => (
-                          <span key={m} className="text-[7px] font-mono px-1 rounded" style={{ background: "var(--color-b2)", color: "var(--color-t2)" }}>{m}</span>
-                        ))}
-                        {pep.modifications.length > 2 && <span className="text-[7px] font-mono" style={{ color: "var(--color-t2)" }}>+{pep.modifications.length - 2}</span>}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Alphabetical Bar */}
+      <div className="flex items-center gap-[3px] flex-wrap mb-3">
+        <button
+          onClick={() => setLetter(null)}
+          className="rounded px-[5px] py-[1px] text-[8px] font-mono cursor-pointer"
+          style={{
+            background: !letter ? "var(--color-a2)" : "var(--color-b2)",
+            color: !letter ? "#fff" : "var(--color-t2)",
+            border: `1px solid ${!letter ? "var(--color-a2)" : "var(--color-bd)"}`,
+          }}
+        >
+          All
+        </button>
+        {letters.map(l => (
+          <button
+            key={l}
+            onClick={() => setLetter(letter === l ? null : l)}
+            className="rounded px-[5px] py-[1px] text-[8px] font-mono cursor-pointer"
+            style={{
+              background: letter === l ? "var(--color-a2)" : "var(--color-b2)",
+              color: letter === l ? "#fff" : "var(--color-t2)",
+              border: `1px solid ${letter === l ? "var(--color-a2)" : "var(--color-bd)"}`,
+            }}
+          >
+            {l}
+          </button>
+        ))}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-[8px] font-mono" style={{ color: "var(--color-t2)" }}>
-            {pg * PER_PAGE + 1}–{Math.min((pg + 1) * PER_PAGE, filtered.length)} of {filtered.length}
-          </span>
-          <div className="flex gap-1">
-            <button onClick={() => setPg(p => Math.max(0, p - 1))} disabled={pg === 0}
-              className="rounded px-2 py-[2px] text-[9px] cursor-pointer"
-              style={{ background: "var(--color-b2)", color: pg === 0 ? "var(--color-t2)" : "var(--color-t0)", border: "1px solid var(--color-bd)" }}>
-              ←
-            </button>
-            <button onClick={() => setPg(p => Math.min(totalPages - 1, p + 1))} disabled={pg === totalPages - 1}
-              className="rounded px-2 py-[2px] text-[9px] cursor-pointer"
-              style={{ background: "var(--color-b2)", color: pg === totalPages - 1 ? "var(--color-t2)" : "var(--color-t0)", border: "1px solid var(--color-bd)" }}>
-              →
-            </button>
-          </div>
+      {/* Card Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[7px]">
+        {filtered.map((pep, i) => {
+          const admin = pep.administrationMethod || pep.route.split(";")[0].trim();
+          const summary = pep.shortSummary || pep.description;
+          return (
+            <BioCard
+              key={pep.id}
+              className="cursor-pointer transition-colors"
+              style={{ animation: `fi 0.15s ${i * 0.02}s both` }}
+              onClick={() => router.push(`/peptides/dictionary/${pep.id}`)}
+            >
+              {/* Name */}
+              <div className="flex items-start justify-between gap-1 mb-1">
+                <div className="font-semibold text-[12px]" style={{ color: "var(--color-a2)" }}>
+                  {pep.name}
+                </div>
+                <span
+                  className="text-[7px] font-mono px-1.5 py-[1px] rounded-sm whitespace-nowrap shrink-0"
+                  style={{ background: "rgba(100,181,246,0.08)", color: "var(--color-a2)", border: "1px solid rgba(100,181,246,0.12)" }}
+                >
+                  {admin}
+                </span>
+              </div>
+
+              {/* Primary Benefit */}
+              {pep.primaryBenefit && (
+                <div className="text-[9px] font-medium mb-1" style={{ color: "var(--color-t1)" }}>
+                  {pep.primaryBenefit}
+                </div>
+              )}
+
+              {/* Short Summary */}
+              <div
+                className="text-[8.5px] leading-relaxed mb-1.5 line-clamp-2"
+                style={{ color: "var(--color-t2)" }}
+              >
+                {summary}
+              </div>
+
+              {/* Use Case Tags */}
+              {pep.useCases.length > 0 && (
+                <div className="flex flex-wrap gap-[3px]">
+                  {pep.useCases.slice(0, 3).map(u => (
+                    <span
+                      key={u}
+                      className="text-[7px] font-mono px-1 py-[0.5px] rounded"
+                      style={{ background: "rgba(100,181,246,0.06)", color: "var(--color-a2)", border: "1px solid rgba(100,181,246,0.1)" }}
+                    >
+                      {u}
+                    </span>
+                  ))}
+                  {pep.useCases.length > 3 && (
+                    <span className="text-[7px] font-mono" style={{ color: "var(--color-t2)" }}>
+                      +{pep.useCases.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+            </BioCard>
+          );
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="text-center py-10 text-[10px]" style={{ color: "var(--color-t2)" }}>
+          No peptides match your filters.
         </div>
       )}
     </div>
