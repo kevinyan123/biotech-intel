@@ -28,6 +28,14 @@ interface Filing {
   accession?: string;
 }
 
+interface IdentityResult {
+  cik: number | null;
+  secCompanyName: string | null;
+  validated: boolean;
+  validationMethod: string;
+  confidence: number;
+}
+
 export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const co = DB.companies.find((c) => c.id === id);
@@ -40,27 +48,55 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   const approved = dr.filter((d) => (d.highestPhase || d.phase) === "Approved").length;
   const failed = tr.filter((t) => t.status === "Terminated").length;
 
+  // Identity resolution state
+  const [identity, setIdentity] = useState<IdentityResult | null>(null);
+  const [identityLoading, setIdentityLoading] = useState(false);
+
+  // SEC filings state
   const [filings, setFilings] = useState<Filing[]>([]);
   const [filingsLoading, setFilingsLoading] = useState(false);
   const [secFound, setSecFound] = useState<boolean | null>(null);
   const [secCompany, setSecCompany] = useState<string | null>(null);
 
+  // Two-step identity resolution → SEC data fetch
   useEffect(() => {
     if (!co.isPublic || !co.ticker) return;
-    setFilingsLoading(true);
 
-    fetch(`/api/sec?ticker=${encodeURIComponent(co.ticker)}`)
+    // International companies: skip SEC entirely
+    if (!co.secEligible) {
+      setIdentity({ cik: null, secCompanyName: null, validated: false, validationMethod: "not_applicable", confidence: 0 });
+      return;
+    }
+
+    setIdentityLoading(true);
+
+    // Step 1: Resolve and validate identity
+    fetch(`/api/identity?ticker=${encodeURIComponent(co.ticker)}&company=${encodeURIComponent(co.name)}`)
       .then((r) => r.json())
-      .then((data) => {
-        setFilings(data.filings || []);
-        setSecFound(data.found ?? false);
-        setSecCompany(data.company || null);
+      .then((idData: IdentityResult) => {
+        setIdentity(idData);
+
+        // Step 2: Only fetch SEC filings if identity is validated
+        if (idData.validated && idData.cik) {
+          setFilingsLoading(true);
+          return fetch(`/api/sec?ticker=${encodeURIComponent(co.ticker!)}&cik=${idData.cik}`)
+            .then((r) => r.json())
+            .then((data) => {
+              setFilings(data.filings || []);
+              setSecFound(data.found ?? false);
+              setSecCompany(data.company || null);
+            })
+            .finally(() => setFilingsLoading(false));
+        } else {
+          setSecFound(false);
+        }
       })
       .catch(() => {
+        setIdentity({ cik: null, secCompanyName: null, validated: false, validationMethod: "error", confidence: 0 });
         setSecFound(false);
       })
-      .finally(() => setFilingsLoading(false));
-  }, [co.isPublic, co.ticker]);
+      .finally(() => setIdentityLoading(false));
+  }, [co.isPublic, co.ticker, co.name, co.secEligible]);
 
   return (
     <div style={{ animation: "fi .2s ease-out" }}>
@@ -80,9 +116,24 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold mb-0.5">{co.name}</h2>
           <div className="flex gap-2.5 text-[11px] flex-wrap items-center" style={{ color: "var(--color-t2)" }}>
-            {co.ticker && <span className="font-mono font-semibold text-xs" style={{ color: "var(--color-a2)" }}>{co.ticker}</span>}
+            {co.ticker && (
+              <span className="font-mono font-semibold text-xs flex items-center gap-1" style={{ color: "var(--color-a2)" }}>
+                {co.ticker}
+                {/* Validation indicator */}
+                {identity?.validated && (
+                  <span title={`SEC Verified: ${identity.secCompanyName} (CIK ${identity.cik})`}
+                    className="text-[9px]" style={{ color: "#00e676" }}>✓</span>
+                )}
+                {identity && !identity.validated && identity.cik && identity.validationMethod === "unvalidated" && (
+                  <span title={`SEC name mismatch: "${identity.secCompanyName}"`}
+                    className="text-[9px]" style={{ color: "#ffb74d" }}>⚠</span>
+                )}
+              </span>
+            )}
             {co.ticker && <span>·</span>}
-            {co.exchange && co.exchange !== "Private" && co.exchange !== "Acq" && <span>{co.exchange}</span>}
+            {co.exchange && co.exchange !== "Private" && co.exchange !== "Acq" && (
+              <span>{co.exchange}{!co.secEligible && co.isPublic ? "" : ""}</span>
+            )}
             <span>{co.hq}</span>
             {co.founded && <span>Founded {co.founded}</span>}
             {co.employees && <span>{co.employees.toLocaleString()} employees</span>}
@@ -169,28 +220,28 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         </table>
       </div>
 
-      {/* SEC Filings — fetched server-side via /api/sec */}
-      {co.isPublic && <>
+      {/* SEC Filings & Financial Documents */}
+      {co.isPublic && co.secEligible && <>
         <SectionHeader>SEC Filings & Financial Documents</SectionHeader>
 
         {/* Loading state */}
-        {filingsLoading && (
+        {(identityLoading || filingsLoading) && (
           <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
             <div className="text-xs" style={{ color: "var(--color-t2)" }}>
-              <span className="inline-block animate-pulse">Fetching filings from SEC EDGAR...</span>
+              <span className="inline-block animate-pulse">
+                {identityLoading ? "Verifying company identity..." : "Fetching filings from SEC EDGAR..."}
+              </span>
             </div>
           </BioCard>
         )}
 
-        {/* Real filings found — every link goes directly to the filing document */}
-        {!filingsLoading && filings.length > 0 && (
+        {/* Identity validated → show filings */}
+        {!identityLoading && !filingsLoading && identity?.validated && filings.length > 0 && (
           <>
-            {secCompany && (
-              <div className="text-[9px] mb-1.5 flex items-center gap-1.5" style={{ color: "var(--color-t2)" }}>
-                <span className="inline-block w-[5px] h-[5px] rounded-full" style={{ background: "#00e676" }} />
-                SEC EDGAR: {secCompany} — {filings.length} filings · Direct document links
-              </div>
-            )}
+            <div className="text-[9px] mb-1.5 flex items-center gap-1.5" style={{ color: "var(--color-t2)" }}>
+              <span className="inline-block w-[5px] h-[5px] rounded-full" style={{ background: "#00e676" }} />
+              SEC Verified: {identity.secCompanyName} (CIK {identity.cik}) — {filings.length} filings
+            </div>
             <div className="rounded-lg mb-4" style={{ border: "1px solid var(--color-bd)", maxHeight: 300, overflowY: "auto", background: "var(--color-b1)" }}>
               {filings.map((f, i) => (
                 <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
@@ -216,28 +267,64 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           </>
         )}
 
-        {/* Ticker not found in SEC — no filings to show */}
-        {!filingsLoading && filings.length === 0 && secFound === false && (
+        {/* Identity validated but no filings */}
+        {!identityLoading && !filingsLoading && identity?.validated && filings.length === 0 && secFound === true && (
           <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
-            <div className="text-xs mb-1.5" style={{ color: "var(--color-t2)" }}>
-              Ticker <span className="font-mono font-semibold">{co.ticker}</span> not found in SEC EDGAR.
+            <div className="text-[9px] mb-1 flex items-center justify-center gap-1.5" style={{ color: "var(--color-t2)" }}>
+              <span className="inline-block w-[5px] h-[5px] rounded-full" style={{ background: "#00e676" }} />
+              SEC Verified: {identity.secCompanyName}
             </div>
-            <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>
-              This company may file under a different name or jurisdiction.
-            </div>
-          </BioCard>
-        )}
-
-        {/* Ticker found but no matching filing types */}
-        {!filingsLoading && filings.length === 0 && secFound === true && (
-          <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
             <div className="text-xs" style={{ color: "var(--color-t2)" }}>
               No recent 10-K, 10-Q, or 8-K filings found for <span className="font-mono font-semibold">{co.ticker}</span>.
             </div>
           </BioCard>
         )}
+
+        {/* Identity mismatch — suppress data */}
+        {!identityLoading && identity && !identity.validated && identity.cik && identity.validationMethod === "unvalidated" && (
+          <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+            <div className="flex items-center justify-center gap-1.5 text-xs mb-1.5" style={{ color: "#ffb74d" }}>
+              <span style={{ fontSize: 14 }}>⚠</span> Identity Mismatch
+            </div>
+            <div className="text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>
+              Ticker <span className="font-mono font-semibold">{co.ticker}</span> resolves to
+              {" "}<span className="font-semibold">&ldquo;{identity.secCompanyName}&rdquo;</span> in SEC EDGAR (CIK {identity.cik}).
+            </div>
+            <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>
+              SEC filings suppressed to prevent showing data from a different company.
+            </div>
+          </BioCard>
+        )}
+
+        {/* Ticker not found in SEC */}
+        {!identityLoading && identity && !identity.validated && identity.validationMethod === "not_found" && (
+          <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+            <div className="text-xs mb-1.5" style={{ color: "var(--color-t2)" }}>
+              Ticker <span className="font-mono font-semibold">{co.ticker}</span> not found in SEC EDGAR.
+            </div>
+            <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>
+              This company may file under a different name or may not have SEC reporting obligations.
+            </div>
+          </BioCard>
+        )}
       </>}
 
+      {/* International public companies — SEC not applicable */}
+      {co.isPublic && !co.secEligible && (
+        <div className="mb-4">
+          <SectionHeader>SEC Filings & Financial Documents</SectionHeader>
+          <BioCard style={{ padding: 20, textAlign: "center" }}>
+            <div className="text-xs mb-1" style={{ color: "var(--color-t2)" }}>
+              SEC filings are not available for <span className="font-semibold">{co.exchange}</span>-listed companies.
+            </div>
+            <div className="text-[10px]" style={{ color: "var(--color-t2)" }}>
+              {co.name} trades on {co.exchange} ({co.country}). SEC EDGAR only covers US-listed issuers.
+            </div>
+          </BioCard>
+        </div>
+      )}
+
+      {/* Private/Acquired companies */}
       {!co.isPublic && (
         <div className="mb-4">
           <SectionHeader>Financial Documents</SectionHeader>
@@ -249,11 +336,17 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {/* Insider Trading Activity — public companies with a ticker only */}
+      {/* Insider Trading Activity */}
       {co.isPublic && co.ticker && (
         <>
           <SectionHeader>Insider Trading Activity</SectionHeader>
-          <InsiderTrading ticker={co.ticker} />
+          <InsiderTrading
+            ticker={co.ticker}
+            cik={identity?.cik ?? undefined}
+            validated={identity?.validated}
+            secEligible={co.secEligible}
+            companyName={co.name}
+          />
         </>
       )}
 

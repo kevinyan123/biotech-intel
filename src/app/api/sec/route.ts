@@ -3,12 +3,22 @@ import { getTickerMap, getSubmissions } from "@/lib/api/sec-shared";
 
 export async function GET(req: NextRequest) {
   const ticker = req.nextUrl.searchParams.get("ticker")?.trim().toUpperCase();
-  if (!ticker) return NextResponse.json({ error: "Missing ?ticker=" }, { status: 400 });
+  const cikParam = req.nextUrl.searchParams.get("cik");
+
+  if (!ticker && !cikParam) return NextResponse.json({ error: "Missing ?ticker= or ?cik=" }, { status: 400 });
 
   try {
-    const map = await getTickerMap();
-    const cik = map[ticker];
-    if (!cik) return NextResponse.json({ filings: [], found: false });
+    let cik: number;
+    if (cikParam) {
+      // Use pre-validated CIK directly (from /api/identity)
+      cik = parseInt(cikParam, 10);
+      if (isNaN(cik)) return NextResponse.json({ error: "Invalid cik" }, { status: 400 });
+    } else {
+      const map = await getTickerMap();
+      const resolved = map[ticker!];
+      if (!resolved) return NextResponse.json({ filings: [], found: false });
+      cik = resolved;
+    }
 
     const sub = await getSubmissions(cik);
     if (!sub?.filings?.recent) return NextResponse.json({ filings: [], found: true });

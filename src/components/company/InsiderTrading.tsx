@@ -38,14 +38,43 @@ type FilterType = "All" | "Buy" | "Sell";
 
 const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export default function InsiderTrading({ ticker }: { ticker: string }) {
+interface InsiderTradingProps {
+  ticker: string;
+  cik?: number | null;        // pre-validated CIK from identity resolution
+  validated?: boolean;         // whether identity was validated
+  secEligible?: boolean;       // whether SEC data is applicable for this exchange
+  companyName?: string;        // for display in messages
+}
+
+export default function InsiderTrading({
+  ticker, cik, validated, secEligible = true, companyName,
+}: InsiderTradingProps) {
   const [data, setData] = useState<InsiderResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>("All");
 
   useEffect(() => {
+    // Don't fetch if SEC not applicable for this exchange
+    if (!secEligible) {
+      setLoading(false);
+      return;
+    }
+    // Don't fetch if identity resolution ran and validation failed
+    if (validated === false) {
+      setLoading(false);
+      return;
+    }
+    // Wait for identity resolution to complete (validated is still undefined)
+    if (cik === undefined && validated === undefined) {
+      // Identity not yet resolved — keep loading
+      return;
+    }
+
     setLoading(true);
-    fetch(`/api/insider?ticker=${encodeURIComponent(ticker)}`)
+    const params = new URLSearchParams({ ticker });
+    if (cik) params.set("cik", String(cik));
+
+    fetch(`/api/insider?${params}`)
       .then((r) => r.json())
       .then((d: InsiderResponse) => setData(d))
       .catch(() =>
@@ -57,7 +86,7 @@ export default function InsiderTrading({ ticker }: { ticker: string }) {
         }),
       )
       .finally(() => setLoading(false));
-  }, [ticker]);
+  }, [ticker, cik, validated, secEligible]);
 
   // Filtered transactions
   const filtered = useMemo(() => {
@@ -92,6 +121,28 @@ export default function InsiderTrading({ ticker }: { ticker: string }) {
         Sells: Math.round(v.sells),
       }));
   }, [data]);
+
+  // ── Not SEC-eligible (international exchange) ──
+  if (!secEligible) {
+    return (
+      <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+        <div className="text-xs" style={{ color: "var(--color-t2)" }}>
+          Insider trading data is not available for non-US exchanges.
+        </div>
+      </BioCard>
+    );
+  }
+
+  // ── Identity validation failed (mismatch) ──
+  if (validated === false) {
+    return (
+      <BioCard style={{ padding: 20, textAlign: "center" }} className="mb-4">
+        <div className="text-xs" style={{ color: "var(--color-t2)" }}>
+          Insider trading data suppressed — company identity could not be verified.
+        </div>
+      </BioCard>
+    );
+  }
 
   // ── Loading ──
   if (loading) {

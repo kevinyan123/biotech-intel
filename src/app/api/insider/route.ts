@@ -178,25 +178,37 @@ async function discoverForm4Filings(
 
 export async function GET(req: NextRequest) {
   const ticker = req.nextUrl.searchParams.get("ticker")?.trim().toUpperCase();
-  if (!ticker) {
-    return NextResponse.json({ error: "Missing ?ticker=" }, { status: 400 });
+  const cikParam = req.nextUrl.searchParams.get("cik");
+
+  if (!ticker && !cikParam) {
+    return NextResponse.json({ error: "Missing ?ticker= or ?cik=" }, { status: 400 });
   }
 
+  const cacheKey = ticker || cikParam || "";
+
   // Check cache
-  const cached = insiderCache.get(ticker);
+  const cached = insiderCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
     return NextResponse.json(cached.data);
   }
 
   try {
-    const map = await getTickerMap();
-    const cik = map[ticker];
-    if (!cik) {
-      const result: InsiderResponse = {
-        found: false, ticker, transactions: [], summary: emptySummary(),
-      };
-      insiderCache.set(ticker, { data: result, ts: Date.now() });
-      return NextResponse.json(result);
+    let cik: number;
+    if (cikParam) {
+      // Use pre-validated CIK directly (from /api/identity)
+      cik = parseInt(cikParam, 10);
+      if (isNaN(cik)) return NextResponse.json({ error: "Invalid cik" }, { status: 400 });
+    } else {
+      const map = await getTickerMap();
+      const resolved = map[ticker!];
+      if (!resolved) {
+        const result: InsiderResponse = {
+          found: false, ticker: ticker || "", transactions: [], summary: emptySummary(),
+        };
+        insiderCache.set(cacheKey, { data: result, ts: Date.now() });
+        return NextResponse.json(result);
+      }
+      cik = resolved;
     }
 
     // Discover Form 4 filings via EDGAR EFTS
@@ -204,9 +216,9 @@ export async function GET(req: NextRequest) {
 
     if (form4s.length === 0) {
       const result: InsiderResponse = {
-        found: true, ticker, transactions: [], summary: emptySummary(),
+        found: true, ticker: ticker || "", transactions: [], summary: emptySummary(),
       };
-      insiderCache.set(ticker, { data: result, ts: Date.now() });
+      insiderCache.set(cacheKey, { data: result, ts: Date.now() });
       return NextResponse.json(result);
     }
 
@@ -254,7 +266,7 @@ export async function GET(req: NextRequest) {
 
     const apiResult: InsiderResponse = {
       found: true,
-      ticker,
+      ticker: ticker || "",
       transactions: allTransactions,
       summary: {
         totalBuys: Math.round(totalBuys * 100) / 100,
@@ -265,13 +277,13 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    insiderCache.set(ticker, { data: apiResult, ts: Date.now() });
+    insiderCache.set(cacheKey, { data: apiResult, ts: Date.now() });
     return NextResponse.json(apiResult);
   } catch (err: any) {
     console.error("Insider API error:", err?.message);
     return NextResponse.json({
       found: false,
-      ticker,
+      ticker: ticker || "",
       transactions: [],
       summary: emptySummary(),
       error: err?.message,

@@ -99,6 +99,7 @@ export interface Company {
   isPublic: boolean;
   fundingStatus: string;
   website: string | null;
+  secEligible: boolean;       // true only for NYSE/NASDAQ/OTC (US-listed, SEC data available)
 }
 
 export interface Drug {
@@ -1349,25 +1350,39 @@ Renascience|4583.T|TSE|Tokyo JP|JP|bio|2001|10|0.02|14|Trypsin Inh|ex
 
 // -- Parse compact data --
 
+const SEC_EXCHANGES = new Set(["NYSE", "NASDAQ", "OTC"]);
+
 function parseDB(): Company[] {
   const lines = C_DATA.trim().split("\n");
-  const seen = new Set<string>();
+  const seenNames = new Set<string>();
+  const seenTickers = new Set<string>();
   const cos: Company[] = [];
   let ci = 0;
   for (const line of lines) {
     const p = line.split("|");
     if (p.length < 12) continue;
     const nm = p[0].trim();
-    if (seen.has(nm)) continue;
-    seen.add(nm);
-    const isPub = p[2] !== "Private" && p[2] !== "NP" && p[2] !== "Gov" && p[2] !== "Acq" && p[1] !== "—";
+    const ticker = p[1].trim();
+    const exchange = p[2].trim();
+    const isPub = exchange !== "Private" && exchange !== "NP" && exchange !== "Gov" && exchange !== "Acq" && ticker !== "—";
+
+    // Deduplicate: public companies by ticker+exchange, private by name
+    if (isPub) {
+      const tickerKey = `${ticker}|${exchange}`;
+      if (seenTickers.has(tickerKey)) continue;
+      seenTickers.add(tickerKey);
+    } else {
+      if (seenNames.has(nm)) continue;
+      seenNames.add(nm);
+    }
+
     const areas = p[9].split(",").map(i => TA[+i] || TA[0]).filter(Boolean);
     const mc = parseFloat(p[8]) || null;
     cos.push({
       id: `c${ci++}`,
       name: nm,
-      ticker: isPub ? p[1] : null,
-      exchange: p[2],
+      ticker: isPub ? ticker : null,
+      exchange,
       hq: p[3],
       country: p[4],
       type: p[5] === "bio" ? "biotech" : p[5] === "med" ? "medtech" : p[5],
@@ -1378,8 +1393,9 @@ function parseDB(): Company[] {
       platform: p[10],
       source: p[11] === "ex" ? "exchange" : p[11] === "ts" ? "trial_sponsor" : p[11] === "aq" ? "acquired" : p[11] === "pr" ? "private" : "other",
       isPublic: isPub,
-      fundingStatus: p[2] === "Acq" ? "Acquired" : isPub ? "Public" : "Private",
-      website: p[2] !== "Acq" ? `https://www.${nm.toLowerCase().replace(/[^a-z0-9]/g, "")}.com` : null,
+      fundingStatus: exchange === "Acq" ? "Acquired" : isPub ? "Public" : "Private",
+      website: exchange !== "Acq" ? `https://www.${nm.toLowerCase().replace(/[^a-z0-9]/g, "")}.com` : null,
+      secEligible: isPub && SEC_EXCHANGES.has(exchange),
     });
   }
   return cos;
