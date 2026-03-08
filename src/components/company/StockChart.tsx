@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
-  Tooltip, ReferenceDot, ReferenceLine, CartesianGrid,
+  Tooltip, ReferenceDot, CartesianGrid,
 } from "recharts";
-import { chartMarkerColor, chartMarkerCategory, relativeTime, CHART_MARKER_LEGEND } from "@/lib/catalyst-utils";
+import { chartMarkerCategory, relativeTime } from "@/lib/catalyst-utils";
 
 interface Catalyst { id: string; date: string; type: string; drugId: string; drugName: string | null; companyId: string; companyName: string; indication: string; }
 
@@ -19,16 +19,15 @@ interface Props {
 /* ── helpers ─────────────────────────────────────────────────────── */
 const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const toTs = (d: string) => new Date(d + "T00:00:00").getTime();
-const toDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const fmtAxis = (ts: number) => { const d = new Date(ts); return `${MO[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`; };
 const fmtFull = (ts: number) => { const d = new Date(ts); return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; };
+
+const DATA_READOUT_COLOR = "#64b5f6";
 
 /**
  * Linearly interpolate (or snap) the price at `target` using a sorted
  * array of {ts,price} candles.  If the target falls on a non-trading day
  * the price is interpolated between the two surrounding candles.
- * For dates beyond the last candle the last close is returned.
- * For dates before the first candle null is returned.
  */
 function interpolatePrice(
   target: number,
@@ -38,16 +37,13 @@ function interpolatePrice(
   if (target <= data[0].ts) return data[0].price;
   if (target >= data[data.length - 1].ts) return data[data.length - 1].price;
 
-  // Binary-search for the right bracket
   let lo = 0, hi = data.length - 1;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
     if (data[mid].ts < target) lo = mid + 1; else hi = mid;
   }
-  // data[lo] is the first entry >= target
   if (data[lo].ts === target) return data[lo].price;
 
-  // Interpolate between data[lo-1] and data[lo]
   const before = data[lo - 1];
   const after  = data[lo];
   const t = (target - before.ts) / (after.ts - before.ts);
@@ -61,21 +57,13 @@ interface MarkerDatum {
   type: string;
   drugName: string | null;
   indication: string;
-  ts: number;              // catalyst timestamp
-  price: number;           // interpolated price at ts
-  color: string;           // marker fill color
-  category: string;
-  isFuture: boolean;
-  // after clustering:
-  clusterY: number;        // rendered y, may be nudged to avoid overlap
+  ts: number;
+  price: number;
+  clusterY: number;
 }
 
 /* ── cluster nudge ───────────────────────────────────────────────── */
-const MARKER_PX_R = 8; // rendered radius in data-space equiv
-/**
- * Given markers sorted by ts, nudge clusterY so that markers within
- * `minGapTs` of each other don't overlap vertically.
- */
+const MARKER_PX_R = 8;
 function clusterMarkers(
   markers: MarkerDatum[],
   priceRange: number,
@@ -83,9 +71,8 @@ function clusterMarkers(
 ): MarkerDatum[] {
   if (markers.length <= 1) return markers;
   const pxPerDollar = chartHeightPx / (priceRange || 1);
-  const minGapDollars = (MARKER_PX_R * 2.5) / pxPerDollar; // min $ gap
+  const minGapDollars = (MARKER_PX_R * 2.5) / pxPerDollar;
 
-  // group by proximity in time (within 7 days)
   const DAY7 = 7 * 86400000;
   const groups: MarkerDatum[][] = [];
   let cur: MarkerDatum[] = [markers[0]];
@@ -99,12 +86,9 @@ function clusterMarkers(
   }
   groups.push(cur);
 
-  // within each group, spread markers vertically if they overlap
   for (const g of groups) {
     if (g.length <= 1) continue;
-    // sort by price ascending
     g.sort((a, b) => a.price - b.price);
-    // assign clusterY with minimum gap
     g[0].clusterY = g[0].price;
     for (let i = 1; i < g.length; i++) {
       const needed = g[i - 1].clusterY + minGapDollars;
@@ -118,7 +102,6 @@ function clusterMarkers(
 /* ── component ───────────────────────────────────────────────────── */
 export default function StockChart({ companyId, ticker, marketCap, catalysts }: Props) {
   const [timeRange, setTimeRange] = useState<"6M"|"1Y"|"2Y">("1Y");
-  const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
 
   const [allData, setAllData] = useState<{ ts: number; price: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,33 +149,13 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
     return { change, pct, isUp: change >= 0 };
   }, [historicalData]);
 
-  /* ── filtered catalysts ── */
-  const filteredCatalysts = useMemo(() => {
-    return catalysts
-      .filter(c => !hiddenCats.has(chartMarkerCategory(c.type)))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [catalysts, hiddenCats]);
-
-  /* ── chart data: historical + null-price stubs for future catalyst dates ── */
+  /* ── chart data: only historical prices, no future stubs ── */
   const chartData = useMemo(() => {
     if (historicalData.length === 0) return [];
-    const data: { ts: number; price: number | null }[] =
-      historicalData.map(d => ({ ts: d.ts, price: d.price }));
+    return historicalData.map(d => ({ ts: d.ts, price: d.price }));
+  }, [historicalData]);
 
-    // add future catalyst dates with null price (extends x-domain, no line drawn)
-    const seen = new Set(data.map(d => d.ts));
-    filteredCatalysts.forEach(c => {
-      const cts = toTs(c.date);
-      if (cts > lastTs && !seen.has(cts)) {
-        data.push({ ts: cts, price: null });
-        seen.add(cts);
-      }
-    });
-    data.sort((a, b) => a.ts - b.ts);
-    return data;
-  }, [historicalData, filteredCatalysts, lastTs]);
-
-  /* ── build markers with interpolated prices ── */
+  /* ── build markers: only past Data Readout catalysts ── */
   const chartMarkers = useMemo(() => {
     if (historicalData.length === 0) return [];
     const chartStart = historicalData[0].ts;
@@ -200,17 +163,20 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
 
     const raw: MarkerDatum[] = [];
 
-    for (const c of filteredCatalysts) {
-      const cts = toTs(c.date);
-      if (cts < chartStart) continue; // outside visible range
+    for (const c of catalysts) {
+      // Only include Data Readout category
+      if (chartMarkerCategory(c.type) !== "results") continue;
 
-      const isFuture = cts > lastTs;
-      // Interpolate the price at the catalyst date using surrounding candles
+      const cts = toTs(c.date);
+
+      // Only past catalysts (on or before last trading day)
+      if (cts > lastTs) continue;
+
+      // Must be within visible chart range
+      if (cts < chartStart) continue;
+
       const price = interpolatePrice(cts, allData);
       if (price === null) continue;
-
-      const color = chartMarkerColor(c.type);
-      const category = chartMarkerCategory(c.type);
 
       raw.push({
         id: c.id,
@@ -220,17 +186,13 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
         indication: c.indication,
         ts: cts,
         price,
-        color,
-        category,
-        isFuture,
-        clusterY: price, // default, may be adjusted by clustering
+        clusterY: price,
       });
     }
 
-    // sort by ts, then cluster to avoid overlap
     raw.sort((a, b) => a.ts - b.ts);
     return clusterMarkers(raw, priceRange, 300);
-  }, [filteredCatalysts, historicalData, allData, lastTs]);
+  }, [catalysts, historicalData, allData, lastTs]);
 
   /* ── tooltip ── */
   const CustomTooltip = ({ active, payload }: any) => {
@@ -238,24 +200,23 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
     const item = payload[0].payload;
     const ts = item.ts as number;
     const price = item.price as number | null;
-    const isFuture = ts > lastTs;
     const dayCats = chartMarkers.filter(c => Math.abs(c.ts - ts) < 86400000);
     return (
       <div style={{ background: "var(--color-b2)", border: "1px solid var(--color-bd2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, maxWidth: 260 }}>
         <div className="font-mono text-[10px] mb-1" style={{ color: "var(--color-t2)" }}>{fmtFull(ts)}</div>
         {price != null && (
-          <div className="font-mono font-bold text-[14px]" style={{ color: isFuture ? "var(--color-t2)" : "var(--color-ac)" }}>${price.toFixed(2)}</div>
+          <div className="font-mono font-bold text-[14px]" style={{ color: "var(--color-ac)" }}>${price.toFixed(2)}</div>
         )}
         {dayCats.map((c, i) => (
           <div key={i} className="mt-1.5 pt-1.5" style={{ borderTop: "1px solid var(--color-bd)" }}>
             <div className="flex items-center gap-1.5">
-              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: c.color }} />
-              <span className="text-[9px] font-bold" style={{ color: c.color }}>{c.type}</span>
-              {c.isFuture && <span className="text-[7px] font-mono px-1 rounded" style={{ background: "var(--color-b3)", color: "var(--color-t2)" }}>upcoming</span>}
+              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: DATA_READOUT_COLOR }} />
+              <span className="text-[9px] font-bold" style={{ color: DATA_READOUT_COLOR }}>{c.type}</span>
+              <span className="text-[7px] font-mono px-1 rounded" style={{ background: `${DATA_READOUT_COLOR}15`, color: DATA_READOUT_COLOR }}>Data Readout</span>
             </div>
             <div className="text-[9px] font-semibold mt-0.5" style={{ color: "var(--color-t0)" }}>{c.drugName}</div>
             <div className="text-[8px]" style={{ color: "var(--color-t2)" }}>{c.indication}</div>
-            <div className="text-[8px] font-mono" style={{ color: c.color }}>
+            <div className="text-[8px] font-mono" style={{ color: DATA_READOUT_COLOR }}>
               {fmtFull(c.ts)} · ${c.price.toFixed(2)} · {relativeTime(c.date)}
             </div>
           </div>
@@ -288,14 +249,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
   const maxP = Math.max(...realPrices);
   const pad = (maxP - minP) * 0.12 || 1;
 
-  const toggleCat = (key: string) => {
-    setHiddenCats(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-  };
-
   const lineColor = priceChange && priceChange.isUp ? "#00f5b0" : "#ff6b6b";
-  const hasFuture = chartMarkers.some(c => c.isFuture);
-  const pastCount  = chartMarkers.filter(c => !c.isFuture).length;
-  const futureCount = chartMarkers.filter(c => c.isFuture).length;
 
   return (
     <div>
@@ -313,7 +267,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
         {stockName && <span className="text-[9px] ml-auto" style={{ color: "var(--color-t2)" }}>{stockName}</span>}
       </div>
 
-      {/* Filters */}
+      {/* Time range + legend */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex gap-[3px]">
           {(["6M", "1Y", "2Y"] as const).map(r => (
@@ -324,18 +278,10 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
             </button>
           ))}
         </div>
-        <div className="flex gap-[3px] flex-wrap">
-          {CHART_MARKER_LEGEND.map(item => {
-            const active = !hiddenCats.has(item.key);
-            return (
-              <button key={item.key} onClick={() => toggleCat(item.key)}
-                className="rounded-[5px] px-[9px] py-[3px] text-[9px] cursor-pointer transition-all inline-flex items-center gap-1"
-                style={{ background: active ? `${item.color}15` : "transparent", border: `1px solid ${active ? `${item.color}44` : "var(--color-bd)"}`, color: active ? item.color : "var(--color-t2)", fontWeight: active ? 600 : 400, opacity: active ? 1 : 0.5 }}>
-                <span className="w-[5px] h-[5px] rounded-full" style={{ background: active ? item.color : "var(--color-t2)" }} />
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-1.5 text-[9px]" style={{ color: "var(--color-t2)" }}>
+          <span className="w-[6px] h-[6px] rounded-full" style={{ background: DATA_READOUT_COLOR }} />
+          <span style={{ color: DATA_READOUT_COLOR, fontWeight: 600 }}>Data Readout</span>
+          <span className="font-mono opacity-60">· {chartMarkers.length} event{chartMarkers.length !== 1 ? "s" : ""}</span>
         </div>
       </div>
 
@@ -367,15 +313,7 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#7e92a644", strokeDasharray: "3 3" }} />
 
-            {/* Today divider when future catalysts exist */}
-            {hasFuture && (
-              <ReferenceLine
-                x={lastTs} stroke="#7e92a6" strokeDasharray="4 4" strokeWidth={1}
-                label={{ value: "Today", position: "insideTopRight", fill: "#7e92a6", fontSize: 8, fontFamily: "JetBrains Mono" }}
-              />
-            )}
-
-            {/* Price line — stops at last real candle */}
+            {/* Price line */}
             <Area
               type="monotone" dataKey="price"
               stroke={lineColor} strokeWidth={1.5}
@@ -385,49 +323,34 @@ export default function StockChart({ companyId, ticker, marketCap, catalysts }: 
               connectNulls={false}
             />
 
-            {/* ── Catalyst markers anchored to the price trajectory ── */}
-            {chartMarkers.map((m, i) => {
-              // If clusterY differs from price, draw a thin connector line
-              const nudged = Math.abs(m.clusterY - m.price) > 0.01;
-              return (
-                <ReferenceDot
-                  key={`cat-${i}`}
-                  x={m.ts}
-                  y={m.clusterY}
-                  r={6}
-                  fill={m.isFuture ? `${m.color}30` : m.color}
-                  stroke={m.isFuture ? m.color : "#0f1319"}
-                  strokeWidth={m.isFuture ? 2 : 2}
-                  strokeDasharray={m.isFuture ? "3 2" : undefined}
-                  isFront={true}
-                />
-              );
-            })}
+            {/* Data Readout markers on the price line */}
+            {chartMarkers.map((m, i) => (
+              <ReferenceDot
+                key={`cat-${i}`}
+                x={m.ts}
+                y={m.clusterY}
+                r={6}
+                fill={DATA_READOUT_COLOR}
+                stroke="#0f1319"
+                strokeWidth={2}
+                isFront={true}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Legend */}
+      {/* Footer */}
       <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
         <div className="flex gap-2.5 text-[8px] flex-wrap items-center" style={{ color: "var(--color-t2)" }}>
-          {CHART_MARKER_LEGEND.map((item, i) => (
-            <span key={i} className="inline-flex items-center gap-[3px]">
-              <span className="w-[6px] h-[6px] rounded-full" style={{ background: item.color }} />
-              {item.label}
-            </span>
-          ))}
-          <span className="mx-1 opacity-30">|</span>
           <span className="inline-flex items-center gap-[3px]">
-            <span className="w-[6px] h-[6px] rounded-full" style={{ background: "#7e92a6" }} />
-            Past
+            <span className="w-[6px] h-[6px] rounded-full" style={{ background: DATA_READOUT_COLOR }} />
+            Data Readout
           </span>
-          <span className="inline-flex items-center gap-[3px]">
-            <span className="w-[6px] h-[6px] rounded-full" style={{ border: "1.5px dashed #7e92a6", background: "transparent" }} />
-            Upcoming
-          </span>
+          <span className="opacity-40">Past clinical trial results (Ph2, Ph3, Interim)</span>
         </div>
         <div className="text-[9px] font-mono" style={{ color: "var(--color-t2)" }}>
-          {ticker} · {pastCount} past · {futureCount} upcoming · Yahoo Finance
+          {ticker} · {chartMarkers.length} readout{chartMarkers.length !== 1 ? "s" : ""} · Yahoo Finance
         </div>
       </div>
     </div>
