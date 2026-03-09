@@ -47,9 +47,13 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (err) {
     console.error("Login error:", err);
-    const message = String(err).includes("better-sqlite3") || String(err).includes("SQLITE") || String(err).includes("no such table")
-      ? "Authentication service is not available in this environment."
-      : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const errStr = err instanceof Error ? err.message : String(err);
+    let message = "Internal server error";
+    if (errStr.includes("does not exist") || errStr.includes("relation")) {
+      message = "Database tables not initialized. Please redeploy.";
+    } else if (errStr.includes("No database URL")) {
+      message = "Database not configured.";
+    }
+    return NextResponse.json({ error: message, debug: errStr }, { status: 500 });
   }
 }
