@@ -55,6 +55,9 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (err) {
     console.error("Registration error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const message = String(err).includes("better-sqlite3") || String(err).includes("SQLITE") || String(err).includes("no such table")
+      ? "Authentication service is not available in this environment."
+      : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
