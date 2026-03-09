@@ -4,12 +4,22 @@ import { Pool } from "@neondatabase/serverless";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
-function createPrismaClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL or POSTGRES_PRISMA_URL environment variable is required");
+function getDatabaseUrl(): string {
+  // Check all common Vercel/Neon env var names
+  const url =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.STORAGE_URL ||
+    process.env.NEON_DATABASE_URL;
+  if (!url) {
+    throw new Error("No database URL found. Set DATABASE_URL in environment variables.");
   }
-  const pool = new Pool({ connectionString });
+  return url;
+}
+
+function createPrismaClient(): PrismaClient {
+  const pool = new Pool({ connectionString: getDatabaseUrl() });
   const adapter = new PrismaNeon(pool);
   return new PrismaClient({ adapter });
 }
