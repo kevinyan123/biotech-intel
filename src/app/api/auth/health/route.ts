@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { neon } from "@neondatabase/serverless";
 
 export async function GET() {
   const checks: Record<string, unknown> = {};
@@ -28,16 +29,48 @@ export async function GET() {
   // 4. Check NEXT_PUBLIC_APP_URL
   checks.appUrl = process.env.NEXT_PUBLIC_APP_URL || "NOT SET";
 
-  // 5. Try database connection
+  // 5. Try raw SQL connection (HTTP-based, most reliable test)
+  const dbUrl =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_URL_NON_POOLING;
+
+  if (dbUrl) {
+    try {
+      const sql = neon(dbUrl);
+      const result = await sql`SELECT 1 as test`;
+      checks.rawConnection = { success: true, result: result[0] };
+    } catch (err) {
+      checks.rawConnection = {
+        success: false,
+        error: err instanceof Error ? err.message : JSON.stringify(err),
+        stack: err instanceof Error ? err.stack?.split("\n").slice(0, 3) : undefined,
+      };
+    }
+
+    // 6. Check if User table exists
+    try {
+      const sql = neon(dbUrl);
+      const tables = await sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
+      checks.tables = tables.map((t: Record<string, string>) => t.tablename);
+    } catch (err) {
+      checks.tables = {
+        error: err instanceof Error ? err.message : JSON.stringify(err),
+      };
+    }
+  }
+
+  // 7. Try Prisma connection
   try {
     const { prisma } = await import("@/lib/prisma");
-    // Try a simple query to check if tables exist
     const userCount = await prisma.user.count();
-    checks.database = { connected: true, userCount };
+    checks.prisma = { connected: true, userCount };
   } catch (err) {
-    checks.database = {
+    checks.prisma = {
       connected: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : JSON.stringify(err),
+      type: err?.constructor?.name,
     };
   }
 

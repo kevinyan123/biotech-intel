@@ -1,6 +1,6 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
+import { neon } from "@neondatabase/serverless";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
@@ -26,8 +26,9 @@ function getDatabaseUrl(): string {
 }
 
 function createPrismaClient(): PrismaClient {
-  const pool = new Pool({ connectionString: getDatabaseUrl() });
-  const adapter = new PrismaNeon(pool);
+  // Use neon() HTTP function instead of Pool (WebSocket) — more reliable in serverless
+  const sql = neon(getDatabaseUrl());
+  const adapter = new PrismaNeon(sql);
   return new PrismaClient({ adapter });
 }
 
