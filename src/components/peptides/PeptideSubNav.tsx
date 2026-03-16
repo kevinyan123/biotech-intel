@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import AuthControls from "@/components/layout/AuthControls";
 
 const sectionNavItems = [
   { label: "Overview", href: "/peptides", exact: true },
@@ -84,10 +83,6 @@ export default function PeptideHeader() {
           </nav>
         </div>
 
-        {/* Auth — always visible, outside scrollable area */}
-        <div className="shrink-0 ml-2">
-          <AuthControls />
-        </div>
       </div>
     </header>
   );

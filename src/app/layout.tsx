@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono, Newsreader } from "next/font/google";
 import Navbar from "@/components/layout/Navbar";
-import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -35,10 +34,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${dmSans.variable} ${jetbrainsMono.variable} ${newsreader.variable} font-sans antialiased`}>
-        <AuthProvider>
-          <Navbar />
-          <main className="max-w-[1280px] mx-auto p-3">{children}</main>
-        </AuthProvider>
+        <Navbar />
+        <main className="max-w-[1280px] mx-auto p-3">{children}</main>
       </body>
     </html>
   );

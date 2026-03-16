@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import AuthControls from "./AuthControls";
 
 const navItems = [
   { label: "Dashboard", href: "/" },
@@ -79,10 +78,6 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Auth — always visible, outside scrollable area */}
-        <div className="shrink-0 ml-2">
-          <AuthControls />
-        </div>
       </div>
     </header>
   );
