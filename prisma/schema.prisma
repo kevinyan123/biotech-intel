@@ -30,6 +30,8 @@ model Company {
   trials           ClinicalTrial[]
   financials       FinancialData[]
   publications     CompanyPublication[]
+
+  @@index([name])
 }
 
 model Drug {
@@ -52,29 +54,36 @@ model Drug {
 }
 
 model ClinicalTrial {
-  id              Int          @id @default(autoincrement())
-  nctId           String       @unique
-  title           String
-  phase           String?
-  status          String?
-  conditions      String?
-  interventions   String?
-  sponsors        String?
-  startDate       String?
-  completionDate  String?
-  enrollment      Int?
-  studyType       String?
-  locations       String?
-  resultsAvailable Boolean     @default(false)
-  briefSummary    String?
-  eligibility     String?
-  companyId       Int?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                    Int          @id @default(autoincrement())
+  nctId                 String       @unique
+  title                 String
+  phase                 String?
+  status                String?
+  conditions            String?      // JSON array of condition strings
+  interventions         String?      // JSON array of {name, type} objects
+  sponsors              String?      // JSON array of sponsor strings
+  startDate             String?
+  primaryCompletionDate String?      // Primary completion date from CT.gov
+  completionDate        String?
+  enrollment            Int?
+  studyType             String?
+  locations             String?      // JSON array of location strings
+  resultsAvailable      Boolean      @default(false)
+  briefSummary          String?
+  eligibility           String?
+  companyId             Int?
+  // Derived readout fields
+  estimatedReadoutDate  String?      // Best available readout date
+  readoutConfidence     String?      // "confirmed" | "estimated" | "unknown"
+  readoutSource         String?      // Human-readable source description
+  readoutSourceTier     Int?         // 1 = confirmed, 3 = estimated from PCD
+  lastSyncedAt          DateTime?    // When this record was last fetched from CT.gov
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
-  company         Company?     @relation(fields: [companyId], references: [id])
-  drugs           DrugTrial[]
-  publications    TrialPublication[]
+  company               Company?     @relation(fields: [companyId], references: [id])
+  drugs                 DrugTrial[]
+  publications          TrialPublication[]
 }
 
 model Publication {
