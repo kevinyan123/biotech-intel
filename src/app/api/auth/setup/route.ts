@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 
 function getDatabaseUrl(): string {
@@ -11,7 +11,14 @@ function getDatabaseUrl(): string {
   );
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Require a secret key to prevent unauthorized access
+  const secret = req.nextUrl.searchParams.get("secret");
+  const expectedSecret = process.env.SETUP_SECRET || process.env.JWT_SECRET;
+  if (!expectedSecret || secret !== expectedSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const dbUrl = getDatabaseUrl();
   if (!dbUrl) {
     return NextResponse.json({ error: "No database URL found" }, { status: 500 });

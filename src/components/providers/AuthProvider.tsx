@@ -71,11 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password, confirmPassword }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        const msg = data.error || "Registration failed";
-        // Include debug info if available (helps diagnose server errors)
-        return { error: data.debug ? `${msg} (${data.debug})` : msg };
-      }
+      if (!res.ok) return { error: data.error || "Registration failed" };
       setUser(data.user);
       return {};
     } catch {

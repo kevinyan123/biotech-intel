@@ -59,6 +59,6 @@ export async function POST(req: NextRequest) {
     } else if (errStr.includes("No database URL")) {
       message = "Database not configured.";
     }
-    return NextResponse.json({ error: message, debug: errStr }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
